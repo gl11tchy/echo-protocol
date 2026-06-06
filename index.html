@@ -281,6 +281,7 @@ const state = {
   selectedTarget: null,
   waveSpawned: 0,
   waveKilled: 0,
+  nextId: 0,
 };
 
 // ============================================================================
@@ -310,6 +311,7 @@ function makePlayer() {
 // ============================================================================
 function makeEnemy(type, x, y) {
   const base = {
+    id: 'C' + (++state.nextId),
     type, x, y,
     heading: Math.random() * 360,
     speed: 4 + Math.random() * 3,
@@ -548,6 +550,8 @@ function tryFire() {
   // fire from sub bow toward aim point (or toward target)
   let aimX, aimY;
   const target = state.selectedTarget ? state.enemies.find(e => e.id === state.selectedTarget) : null;
+  if (state.selectedTarget && !target) state.selectedTarget = null;  // cleanup stale target
+  if (target && target.hull <= 0) { state.selectedTarget = null; }
   if (target) {
     // lead the target
     const lead = Math.hypot(target.x - p.x, target.y - p.y) / 25;
@@ -1544,6 +1548,7 @@ function startGame() {
   state.bubbles = [];
   state.decoys = [];
   state.selectedTarget = null;
+  state.nextId = 0;
   state.player = makePlayer();
   generateTerrain();
   startWave(1);
