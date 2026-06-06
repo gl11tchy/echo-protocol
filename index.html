@@ -1,1958 +1,940 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ECHO PROTOCOL — Benthic Cold War</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.3/p5.min.js"></script>
-  <script>p5.disableFriendlyErrors = true;</script>
-  <style>
-    html, body { margin: 0; padding: 0; overflow: hidden; background: #0a1220; touch-action: none; user-select: none; -webkit-user-select: none; }
-    canvas { display: block; touch-action: none; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECHO PROTOCOL — Tactical Submarine Interface</title>
+<style>
+  :root { --bg: #0a0c0f; --panel: #0f1318; --border: #1a2430; --text: #b8c8d8; --dim: #5a6a7a; --green: #00e676; --amber: #ffb300; --red: #ff3d3d; --cyan: #00e5ff; --blue: #448aff; --white: #e8f0f8; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace; font-size: 12px; overflow: hidden; height: 100vh; user-select: none; -webkit-user-select: none; }
+  #app { display: grid; grid-template-columns: 1fr 340px; grid-template-rows: 32px 1fr auto 36px; height: 100vh; gap: 1px; background: var(--border); }
+  #sysbar { grid-column: 1/3; display: flex; align-items: center; gap: 24px; padding: 0 14px; background: var(--panel); font-size: 13px; border-bottom: 1px solid var(--border); }
+  #sysbar .label { color: var(--dim); margin-right: 4px; }
+  #sysbar .val { color: var(--white); font-weight: bold; }
+  #sysbar .warn { color: var(--red); animation: blink 0.8s infinite; }
+  @keyframes blink { 50% { opacity: 0.4; } }
+  #sonar-panel { position: relative; background: var(--panel); overflow: hidden; border-right: 1px solid var(--border); }
+  #sonar-panel canvas { display: block; }
+  #sonar-label { position: absolute; top: 8px; left: 10px; color: var(--dim); font-size: 10px; letter-spacing: 2px; }
+  #sonar-bearing { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); color: var(--cyan); font-size: 10px; }
+  #side-panel { display: flex; flex-direction: column; background: var(--panel); overflow-y: auto; }
+  .panel-section { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  .panel-title { color: var(--dim); font-size: 9px; letter-spacing: 3px; margin-bottom: 6px; }
+  .contact-row { display: flex; justify-content: space-between; padding: 3px 0; cursor: pointer; border-left: 2px solid transparent; padding-left: 8px; }
+  .contact-row.active { border-left-color: var(--cyan); background: rgba(0,229,255,0.06); }
+  .contact-row .id { color: var(--cyan); width: 28px; }
+  .contact-row .brg { color: var(--white); width: 38px; }
+  .contact-row .cls { width: 70px; }
+  .contact-row .rng { color: var(--dim); width: 55px; text-align: right; }
+  .prob-bar { display: flex; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 3px; }
+  .prob-bar .seg { height: 100%; }
+  .seg-h { background: var(--red); }
+  .seg-d { background: var(--amber); }
+  .seg-w { background: var(--dim); }
+  .seg-b { background: var(--green); }
+  .stat-row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .stat-row .l { color: var(--dim); }
+  .stat-row .v { color: var(--white); }
+  .gauge { height: 6px; background: #1a2430; border-radius: 3px; margin: 4px 0; overflow: hidden; }
+  .gauge .fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+  .fill-green { background: var(--green); }
+  .fill-amber { background: var(--amber); }
+  .fill-red { background: var(--red); }
+  .fill-cyan { background: var(--cyan); }
+  #callouts { grid-column: 1/3; padding: 6px 14px; background: var(--panel); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); min-height: 44px; display: flex; flex-direction: column; justify-content: flex-end; font-size: 11px; }
+  .callout { padding: 2px 0; }
+  .callout.info { color: var(--text); }
+  .callout.warn { color: var(--amber); }
+  .callout.danger { color: var(--red); }
+  .callout.success { color: var(--green); }
+  #cmdline { grid-column: 1/3; display: flex; align-items: center; padding: 0 14px; background: #080a0e; border-top: 1px solid var(--border); }
+  #cmdline .prompt { color: var(--cyan); margin-right: 8px; }
+  #cmdline input { flex: 1; background: none; border: none; color: var(--white); font: inherit; font-size: 13px; outline: none; caret-color: var(--cyan); }
+  #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10; justify-content: center; align-items: center; flex-direction: column; }
+  #overlay.show { display: flex; }
+  #overlay h1 { color: var(--cyan); font-size: 32px; letter-spacing: 8px; margin-bottom: 8px; }
+  #overlay h2 { color: var(--dim); font-size: 13px; letter-spacing: 4px; margin-bottom: 24px; }
+  #overlay .brief { color: var(--text); font-size: 13px; max-width: 500px; text-align: center; line-height: 1.6; margin-bottom: 20px; }
+  #overlay .controls { color: var(--dim); font-size: 11px; margin-bottom: 24px; text-align: center; line-height: 1.8; }
+  #overlay .start { color: var(--green); font-size: 16px; animation: blink 1.2s infinite; cursor: pointer; }
+  #overlay .result { font-size: 20px; margin-bottom: 8px; }
+  #overlay .sub { color: var(--dim); font-size: 13px; margin-bottom: 24px; }
+  @media (max-width: 700px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: 32px 300px auto auto 36px; }
+    #side-panel { max-height: none; }
+    #sonar-panel { border-right: none; border-bottom: 1px solid var(--border); }
+    .contact-row .rng { display: none; }
+  }
+</style>
 </head>
 <body>
+
+<div id="app">
+  <div id="sysbar">
+    <span><span class="label">SPD</span><span class="val" id="v-speed">0</span><span class="label"> kts</span></span>
+    <span><span class="label">DEP</span><span class="val" id="v-depth">200</span><span class="label"> m</span></span>
+    <span><span class="label">HDG</span><span class="val" id="v-heading">315</span><span class="label">°</span></span>
+    <span><span class="label">HULL</span><span class="val" id="v-hull">100</span><span class="label">%</span></span>
+    <span style="margin-left:auto"><span class="label">SIG</span><span class="val" id="v-sig">LOW</span></span>
+  </div>
+
+  <div id="sonar-panel">
+    <canvas id="sonar"></canvas>
+    <div id="sonar-label">PASSIVE SONAR</div>
+    <div id="sonar-bearing">BRG 000°</div>
+  </div>
+
+  <div id="side-panel">
+    <div class="panel-section">
+      <div class="panel-title">CONTACTS</div>
+      <div id="contact-list"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">PROBABILITIES</div>
+      <div id="prob-dash"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">WEAPONS</div>
+      <div id="weapons"></div>
+    </div>
+    <div class="panel-section">
+      <div class="panel-title">DAMAGE CONTROL</div>
+      <div id="damage"></div>
+    </div>
+  </div>
+
+  <div id="callouts"></div>
+
+  <div id="cmdline">
+    <span class="prompt">></span>
+    <input type="text" id="cmd-input" placeholder="type command..." autofocus autocomplete="off" spellcheck="false">
+  </div>
+</div>
+
+<div id="overlay" class="show">
+  <h1>ECHO PROTOCOL</h1>
+  <h2>BENTHIC COLD WAR · 2047</h2>
+  <div class="brief" id="mission-brief"></div>
+  <div class="controls">
+    Commands: spd +2 | dep -50 | turn 45 | ping | fire C1 | decoy | silent | scan | status<br>
+    Active ping REVEALS your position to all enemies within 8km.
+  </div>
+  <div class="start" id="start-btn">▶ CLICK OR PRESS ENTER TO START ◀</div>
+</div>
+
 <script>
-// ═══════════════════════════════════════════════════════════════
-// ECHO PROTOCOL — Benthic Cold War
-// A submarine combat prototype where uncertainty is the battlefield
-// ═══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+// ECHO PROTOCOL — Tactical Submarine Interface
+// ════════════════════════════════════════════════════════
 
-const sketch = (p) => {
-  // ── CONFIGURATION ──────────────────────────────────────────
-  const CFG = {
-    MAP_W: 4000, MAP_H: 4000,           // world size in meters
-    SIM_TICK: 0.5,                        // seconds per simulation tick
-    MAX_SPEED: 22,                        // knots flank
-    DEPTH_SHALLOW: 80, DEPTH_THERMAL_TOP: 150, DEPTH_THERMAL_BOT: 280,
-    DEPTH_CRUSH: 650,
-    ACTIVE_PING_REVEAL_TIME: 45,          // seconds revealed after ping
-    ACTIVE_PING_RANGE: 8000,              // meters
-    TORPEDO_SPEED: 45,                    // knots
-    TORPEDO_RANGE: 6000,                  // meters max
-    DECOY_LIFETIME: 90,                   // seconds
-    DECOY_EFFECTIVENESS: 0.65,            // base chance to fool torpedo
-    RELOAD_TIME: 25,                      // seconds per tube
-    HULL_MAX: 100,
-    CONTACT_UPDATE_INTERVAL: 2,           // seconds between contact updates
-  };
+// ── AUDIO ENGINE ────────────────────────────────────────
+const Audio = (() => {
+  let ctx, master;
+  function init() {
+    if (ctx) return;
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    master.gain.value = 0.5;
+    master.connect(ctx.destination);
+  }
+  function resume() { if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function now() { return ctx ? ctx.currentTime : 0; }
 
-  // ── COLOR PALETTE ──────────────────────────────────────────
-  const COL = {
-    bg:        [12, 18, 36],
-    water:     [18, 32, 56],
-    terrain:   [28, 42, 72],
-    wreck:     [45, 52, 75],
-    trench:    [20, 32, 58],
-    thermal:   [32, 48, 80],
-    player:    [0, 240, 255],
-    playerDim: [0, 160, 200],
-    enemy:     [255, 80, 80],
-    enemyDim:  [180, 40, 40],
-    contact:   [255, 180, 20],
-    torpedo:   [255, 120, 30],
-    decoy:     [120, 200, 255],
-    text:      [220, 235, 250],
-    textDim:   [140, 160, 190],
-    probHi:    [0, 255, 150],
-    probMed:   [255, 190, 30],
-    probLo:    [255, 80, 80],
-    panel:     [16, 24, 44],
-    panelBorder:[50, 70, 110],
-    panelBright:[22, 32, 56],
-    flood:     [40, 130, 220],
-    fire:      [255, 110, 40],
-    warning:   [255, 220, 30],
-    danger:    [255, 60, 60],
-    success:   [0, 240, 150],
-    title:     [180, 220, 255],
-    accent:    [0, 200, 255],
-  };
-
-  // ── GAME STATE ─────────────────────────────────────────────
-  let state = {};
-  let terrain = [];
-  let enemies = [];
-  let torpedoes = [];
-  let decoys = [];
-  let contacts = [];
-  let particles = [];
-  let mission = null;
-  let crewCallouts = [];
-  let simTime = 0;
-  let gameTime = 0;
-  let activePingTimer = 0;
-  let activePingPos = null;
-  let selectedContact = null;
-  let gamePhase = 'briefing'; // briefing | playing | debriefing | gameover
-  let missionNum = 0;
-  let upgrades = [];
-  let keys = {};
-  let camX = 0, camY = 0;
-  let zoom = 1.0;
-  let targetZoom = 1.0;
-  let sonarWaterfall = [];
-  let waterfallMax = 120;
-
-  // ── CLASSES ────────────────────────────────────────────────
-
-  class Submarine {
-    constructor(x, y, depth, heading, isPlayer, name, subClass) {
-      this.x = x; this.y = y; this.depth = depth;
-      this.heading = heading; // radians
-      this.speed = 0; // knots
-      this.targetSpeed = 0;
-      this.isPlayer = isPlayer;
-      this.name = name;
-      this.subClass = subClass;
-      this.hull = CFG.HULL_MAX;
-      this.maxHull = CFG.HULL_MAX;
-      this.flooding = [false, false, false]; // 3 compartments
-      this.sonarDamaged = false;
-      this.engineDamaged = false;
-      this.tubeJammed = [false, false, false];
-      this.decoyRackCrushed = false;
-      this.onFire = false;
-      this.fireTimer = 0;
-
-      // Weapons
-      this.tubes = [
-        { loaded: true, reloadTimer: 0, type: 'guided' },
-        { loaded: true, reloadTimer: 0, type: 'guided' },
-        { loaded: true, reloadTimer: 0, type: 'unguided' },
-      ];
-      this.decoys = this.isPlayer ? 4 : (subClass === 'ace' ? 6 : 2);
-      this.selectedTube = 0;
-
-      // Sensors
-      this.passiveSensitivity = isPlayer ? 1.0 : (subClass === 'stealth' ? 1.4 : 0.9);
-      this.activeSonarQuality = isPlayer ? 1.0 : 0.8;
-
-      // AI state
-      this.aiState = 'patrol'; // patrol | stalk | hunt | evade | attack
-      this.aiTarget = null;
-      this.aiTimer = 0;
-      this.aiPatrolHeading = heading;
-      this.aiAggression = subClass === 'hunter' ? 0.8 : (subClass === 'stealth' ? 0.5 : 0.3);
-      this.aiSkill = subClass === 'ace' ? 0.95 : (subClass === 'stealth' ? 0.8 : 0.5);
-      this.aiMemory = []; // remembers player positions
-      this.aiDecoyTimer = 0;
-      this.aiPingTimer = 0;
-      this.aiLastKnownPlayer = null;
-      this.aiCertainty = 0; // 0-1 how sure AI is about player location
-    }
-
-    get noiseOutput() {
-      if (this.speed < 2) return 0.02;
-      if (this.speed < 6) return 0.08;
-      if (this.speed < 14) return 0.25;
-      if (this.speed < 20) return 0.55;
-      return 0.9;
-    }
-
-    get detectability() {
-      let d = this.noiseOutput;
-      // Depth pressure: deeper = more noise from hull stress
-      if (this.depth > CFG.DEPTH_THERMAL_BOT) d *= 1.0 + (this.depth - CFG.DEPTH_THERMAL_BOT) / 400;
-      // Damage multiplies noise
-      if (this.engineDamaged) d *= 2.5;
-      if (this.sonarDamaged) d *= 1.2;
-      // Thermal layer protection
-      if (this._inThermalLayer()) d *= 0.35;
-      return Math.min(d, 1.0);
-    }
-
-    _inThermalLayer() {
-      return this.depth >= CFG.DEPTH_THERMAL_TOP && this.depth <= CFG.DEPTH_THERMAL_BOT;
-    }
-
-    get crushRisk() {
-      if (this.depth < CFG.DEPTH_CRUSH) return 0;
-      return Math.min((this.depth - CFG.DEPTH_CRUSH) / 150, 1.0);
-    }
-
-    get maxDepth() { return CFG.DEPTH_CRUSH + 150; }
-
-    update(dt) {
-      // Speed smoothing
-      let spdDiff = this.targetSpeed - this.speed;
-      this.speed += Math.sign(spdDiff) * Math.min(Math.abs(spdDiff), 3 * dt);
-      this.speed = Math.max(0, Math.min(this.speed, CFG.MAX_SPEED));
-
-      // Movement
-      let moveX = Math.cos(this.heading) * this.speed * dt * 0.5;
-      let moveY = Math.sin(this.heading) * this.speed * dt * 0.5;
-      this.x += moveX;
-      this.y += moveY;
-
-      // Bounds
-      this.x = p.constrain(this.x, 50, CFG.MAP_W - 50);
-      this.y = p.constrain(this.y, 50, CFG.MAP_H - 50);
-      this.depth = p.constrain(this.depth, 10, this.maxDepth);
-
-      // Crush damage
-      if (this.crushRisk > 0 && p.random() < this.crushRisk * dt * 0.5) {
-        this.takeDamage(5, 'crush');
+  let oceanNoise = null, oceanGain = null;
+  function startAmbient(depth) {
+    if (!ctx) return;
+    stopAmbient();
+    oceanGain = ctx.createGain();
+    oceanGain.gain.value = 0.03;
+    oceanGain.connect(master);
+    let bufSize = ctx.sampleRate * 2;
+    oceanNoise = ctx.createScriptProcessor(256, 1, 1);
+    let phase = 0;
+    oceanNoise.onaudioprocess = (e) => {
+      let out = e.outputBuffer.getChannelData(0);
+      for (let i = 0; i < out.length; i++) {
+        phase += 0.0003;
+        out[i] = (Math.random() * 2 - 1) * 0.15 * (0.6 + 0.4 * Math.sin(phase));
       }
-
-      // Fire spreading
-      if (this.onFire) {
-        this.fireTimer -= dt;
-        if (p.random() < 0.1 * dt) this.takeDamage(3, 'fire');
-        if (this.fireTimer <= 0) this.onFire = false;
-      }
-
-      // Flooding damage over time
-      let floodCount = this.flooding.filter(f => f).length;
-      if (floodCount > 0 && p.random() < floodCount * 0.03 * dt) {
-        this.takeDamage(2, 'flooding');
-      }
-
-      // Reload timers
-      for (let t of this.tubes) {
-        if (!t.loaded && !this.tubeJammed[this.tubes.indexOf(t)]) {
-          t.reloadTimer -= dt;
-          if (t.reloadTimer <= 0) { t.loaded = true; t.reloadTimer = 0; }
-        }
-      }
-
-      // Active ping timer
-      if (this.isPlayer && activePingTimer > 0) {
-        activePingTimer -= dt;
-      }
-
-      // Sonar damage
-      if (this.sonarDamaged && p.random() < 0.01 * dt) {
-        // Random false contacts appear
-        if (p.random() < 0.3) {
-          contacts.push(new Contact(
-            this.x + p.random(-2000, 2000),
-            this.y + p.random(-2000, 2000),
-            this.depth + p.random(-100, 100),
-            'passive', 0.15, this
-          ));
-        }
-      }
-
-      // Update AI
-      if (!this.isPlayer) this._updateAI(dt);
-    }
-
-    takeDamage(amount, source) {
-      this.hull -= amount;
-      if (this.hull < 0) this.hull = 0;
-
-      // Chance of secondary effects
-      if (p.random() < 0.3) {
-        let comp = p.floor(p.random(3));
-        if (!this.flooding[comp]) this.flooding[comp] = true;
-      }
-      if (p.random() < 0.2 && !this.sonarDamaged) this.sonarDamaged = true;
-      if (p.random() < 0.15 && !this.engineDamaged) this.engineDamaged = true;
-      if (p.random() < 0.25 && !this.onFire) { this.onFire = true; this.fireTimer = 30; }
-      if (p.random() < 0.1) {
-        let t = p.floor(p.random(3));
-        this.tubeJammed[t] = true;
-      }
-      if (p.random() < 0.1 && !this.decoyRackCrushed) this.decoyRackCrushed = true;
-
-      if (this.isPlayer) {
-        triggerScreenShake(amount * 0.15);
-        addCallout(`Hull breach! ${amount} damage from ${source}. Hull: ${Math.round(this.hull)}%`, 'danger');
-        if (this.flooding.some(f => f)) addCallout('Flooding detected! Compartments compromised.', 'warning');
-        if (this.sonarDamaged) addCallout('Sonar array damaged — classification degraded.', 'warning');
-        if (this.engineDamaged) addCallout('Engine damage — noise output increased 2.5×', 'warning');
-      }
-    }
-
-    fireTorpedo(tubeIdx, target) {
-      if (!this.tubes[tubeIdx].loaded || this.tubeJammed[tubeIdx]) return null;
-      if (!target) return null;
-
-      this.tubes[tubeIdx].loaded = false;
-      this.tubes[tubeIdx].reloadTimer = CFG.RELOAD_TIME;
-
-      let torp = new Torpedo(
-        this.x, this.y, this.depth,
-        this.heading,
-        this.tubes[tubeIdx].type,
-        this,
-        target
-      );
-      return torp;
-    }
-
-    deployDecoy() {
-      if (this.decoys <= 0 || this.decoyRackCrushed) return null;
-      this.decoys--;
-      let d = new Decoy(this.x, this.y, this.depth, this.heading, this);
-      return d;
-    }
-
-    // ── AI ───────────────────────────────────────────────────
-    _updateAI(dt) {
-      this.aiTimer -= dt;
-      let player = state.player;
-      if (!player) return;
-
-      let distToPlayer = p.dist(this.x, this.y, player.x, player.y);
-      let depthDiff = Math.abs(this.depth - player.depth);
-      let canDetect = distToPlayer < 3000 && this.passiveSensitivity * player.detectability > 0.1;
-
-      // Update certainty about player location
-      if (canDetect) {
-        this.aiCertainty = Math.min(1, this.aiCertainty + dt * 0.3);
-        this.aiLastKnownPlayer = { x: player.x, y: player.y, depth: player.depth, time: gameTime };
-      } else {
-        this.aiCertainty = Math.max(0, this.aiCertainty - dt * 0.1);
-      }
-
-      // AI state machine
-      switch (this.aiState) {
-        case 'patrol':
-          this.targetSpeed = 4 + p.random(2);
-          this.heading += p.random(-0.02, 0.02);
-          if (canDetect && distToPlayer < 2500) {
-            this.aiState = 'stalk';
-            this.aiTimer = 5 + p.random(5);
-          }
-          break;
-
-        case 'stalk':
-          this.targetSpeed = 2;
-          // Steer toward player
-          let angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
-          let angleDiff = angleToPlayer - this.heading;
-          while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-          while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-          this.heading += angleDiff * 0.02;
-
-          // Try to match depth
-          if (this.depth < player.depth - 30) this.depth += 5 * dt;
-          else if (this.depth > player.depth + 30) this.depth -= 5 * dt;
-
-          if (this.aiTimer <= 0 && distToPlayer < 1800 && this.aiCertainty > 0.5) {
-            this.aiState = 'attack';
-            this.aiTimer = 3;
-          }
-          if (!canDetect && this.aiTimer <= 0) {
-            this.aiState = 'patrol';
-          }
-          break;
-
-        case 'attack':
-          this.targetSpeed = 6;
-          // Line up shot
-          angleToPlayer = Math.atan2(player.y - this.y, player.x - this.x);
-          angleDiff = angleToPlayer - this.heading;
-          while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-          while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-          this.heading += angleDiff * 0.05;
-
-          if (Math.abs(angleDiff) < 0.3 && distToPlayer < 2000 && this.aiTimer <= 0) {
-            // Fire!
-            let torpTube = this.tubes.findIndex(t => t.loaded && !this.tubeJammed[this.tubes.indexOf(t)]);
-            if (torpTube >= 0) {
-              this.tubes[torpTube].loaded = false;
-              this.tubes[torpTube].reloadTimer = CFG.RELOAD_TIME;
-              torpedoes.push(new Torpedo(
-                this.x, this.y, this.depth, this.heading,
-                'guided', this, player
-              ));
-              if (this.isPlayer || distToPlayer < 3000) {
-                addCallout('TORPEDO IN THE WATER! Bearing ' + 
-                  Math.round(angleToPlayer * 180 / Math.PI) + '°', 'danger');
-              }
-            }
-            this.aiState = 'evade';
-            this.aiTimer = 15;
-          }
-          break;
-
-        case 'evade':
-          this.targetSpeed = this.subClass === 'stealth' ? 2 : 14;
-          // Turn away and change depth
-          this.heading += p.random(-0.08, 0.08);
-          if (this.depth < CFG.DEPTH_THERMAL_BOT - 30) this.depth += 20 * dt;
-          else this.depth -= 20 * dt;
-
-          // Deploy decoy sometimes
-          if (this.aiTimer < 10 && this.aiDecoyTimer <= 0 && this.decoys > 0) {
-            let d = this.deployDecoy();
-            if (d) decoys.push(d);
-            this.aiDecoyTimer = 30;
-          }
-
-          if (this.aiTimer <= 0) {
-            this.aiState = canDetect ? 'stalk' : 'patrol';
-          }
-          break;
-      }
-
-      // Ace-specific behavior
-      if (this.subClass === 'ace') {
-        // Ace decoy timer
-        this.aiDecoyTimer -= dt;
-        this.aiPingTimer -= dt;
-        // Ace has adaptive tactics based on game state
-        if (gameTime > 20 && this.decoys > 0 && this.aiDecoyTimer <= 0 && p.random() < 0.008) {
-          let d = this.deployDecoy();
-          if (d) {
-            d.isFakePlayer = true;
-            d.speed = 2 + Math.random() * 4;
-            decoys.push(d);
-            this.aiDecoyTimer = 40;
-            addCallout('New contact — possible submarine... 45% confidence', 'warning');
-          }
-        }
-        // Ace uses active ping sparingly and tactically
-        if (this.aiState === 'stalk' && this.aiCertainty < 0.4 && this.aiPingTimer <= 0) {
-          // Active ping — reveals the Ace but locks player position
-          this.aiPingTimer = 60;
-          if (state.player) {
-            this.aiLastKnownPlayer = { x: state.player.x, y: state.player.y, depth: state.player.depth, time: gameTime };
-            this.aiCertainty = 0.9;
-            addCallout('ACTIVE PING DETECTED — Enemy has our position!', 'danger');
-          }
-        }
-        // Ace is harder to detect (quieter engines)
-        this.passiveSensitivity = 1.1; // slightly better than normal stealth
-        // Ace goes silent more aggressively
-        if (this.aiState === 'evade') this.targetSpeed = Math.min(this.targetSpeed, 2);
-      } else {
-        // Non-ace decoy timer (only in evade)
-        if (this.aiState === 'evade') this.aiDecoyTimer -= dt;
-      }
-    }
+    };
+    oceanNoise.connect(oceanGain);
+  }
+  function stopAmbient() {
+    if (oceanNoise) { oceanNoise.disconnect(); oceanNoise = null; }
+    if (oceanGain) { oceanGain.disconnect(); oceanGain = null; }
   }
 
-  class Torpedo {
-    constructor(x, y, depth, heading, type, owner, target) {
-      this.x = x; this.y = y; this.depth = depth;
-      this.heading = heading;
-      this.type = type; // 'guided' | 'unguided'
-      this.owner = owner;
-      this.target = target;
-      this.speed = CFG.TORPEDO_SPEED;
-      this.alive = true;
-      this.traveled = 0;
-      this.wireIntact = type === 'guided';
-      this.age = 0;
-    }
-
-    update(dt) {
-      this.age += dt;
-      this.traveled += this.speed * dt * 0.5;
-
-      if (this.traveled > CFG.TORPEDO_RANGE) { this.alive = false; return; }
-
-      // Guidance
-      if (this.type === 'guided' && this.wireIntact && this.target && this.target.hull > 0) {
-        let angleToTarget = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-        let diff = angleToTarget - this.heading;
-        while (diff > Math.PI) diff -= 2 * Math.PI;
-        while (diff < -Math.PI) diff += 2 * Math.PI;
-        this.heading += diff * Math.min(0.04, 0.02 * dt * 10);
-      } else if (this.type === 'unguided' && this.target && this.target.hull > 0) {
-        // Wake-homing: less accurate
-        let angleToTarget = Math.atan2(this.target.y - this.y, this.target.x - this.x);
-        let diff = angleToTarget - this.heading;
-        while (diff > Math.PI) diff -= 2 * Math.PI;
-        while (diff < -Math.PI) diff += 2 * Math.PI;
-        this.heading += diff * 0.015;
-      }
-
-      // Wire break chance
-      if (this.type === 'guided' && this.wireIntact) {
-        if (p.random() < 0.003 * dt * 10) {
-          this.wireIntact = false;
-          if (this.owner && this.owner.isPlayer) {
-            addCallout('Wire broken — torpedo running autonomous', 'warning');
-          }
-        }
-      }
-
-      this.x += Math.cos(this.heading) * this.speed * dt * 0.5;
-      this.y += Math.sin(this.heading) * this.speed * dt * 0.5;
-
-      // Check for decoy interception
-      for (let d of decoys) {
-        if (!d.alive) continue;
-        let dist = p.dist(this.x, this.y, d.x, d.y);
-        if (dist < 150 && p.random() < CFG.DECOY_EFFECTIVENESS) {
-          this.target = d; // redirect to decoy
-          if (this.owner && this.owner.isPlayer) {
-            addCallout('Torpedo redirected by enemy decoy!', 'warning');
-          }
-          break;
-        }
-      }
-
-      // Check hit
-      if (this.target && this.target.hull > 0) {
-        let dist = p.dist(this.x, this.y, this.target.x, this.target.y);
-        let depthDiff = Math.abs(this.depth - this.target.depth);
-        if (dist < 80 && depthDiff < 60) {
-          this._hit();
-          return;
-        }
-      }
-
-      // Check if target is player (for enemy torpedoes)
-      if (this.owner && !this.owner.isPlayer && state.player) {
-        let dist = p.dist(this.x, this.y, state.player.x, state.player.y);
-        let depthDiff = Math.abs(this.depth - state.player.depth);
-        if (dist < 80 && depthDiff < 60) {
-          this._hitPlayer();
-          return;
-        }
-      }
-    }
-
-    _hit() {
-      this.alive = false;
-      let dmg = this.type === 'unguided' ? 35 : 25;
-      this.target.takeDamage(dmg, 'torpedo');
-      spawnExplosion(this.x, this.y, this.depth);
-      if (this.owner && this.owner.isPlayer) {
-        addCallout('HIT! Target struck!', 'success');
-      }
-    }
-
-    _hitPlayer() {
-      this.alive = false;
-      state.player.takeDamage(30, 'torpedo');
-      spawnExplosion(this.x, this.y, this.depth);
-      addCallout("WE'VE BEEN HIT!", 'danger');
-    }
+  function playPing(freq = 1200) {
+    if (!ctx) return;
+    let t = now();
+    let osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq * 0.5, t);
+    osc.frequency.exponentialRampToValueAtTime(freq, t + 0.05);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.3, t + 0.4);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+    osc.connect(gain); gain.connect(master);
+    osc.start(t); osc.stop(t + 0.6);
   }
 
-  class Decoy {
-    constructor(x, y, depth, heading, owner) {
-      this.x = x; this.y = y; this.depth = depth;
-      this.heading = heading;
-      this.owner = owner;
-      this.alive = true;
-      this.age = 0;
-      this.lifetime = CFG.DECOY_LIFETIME;
-      this.speed = 3 + p.random(3);
-      this.isFakePlayer = false;
+  function playTorpedoLaunch() {
+    if (!ctx) return;
+    let t = now();
+    // Mechanical thud
+    let buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+    let d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.02)) * 0.5;
     }
-
-    update(dt) {
-      this.age += dt;
-      if (this.age > this.lifetime) { this.alive = false; return; }
-      this.heading += p.random(-0.03, 0.03);
-      this.x += Math.cos(this.heading) * this.speed * dt * 0.5;
-      this.y += Math.sin(this.heading) * this.speed * dt * 0.5;
-    }
+    let src = ctx.createBufferSource(), gain = ctx.createGain();
+    src.buffer = buf; gain.gain.value = 0.6;
+    src.connect(gain); gain.connect(master);
+    src.start(t);
+    // High-speed whine
+    let osc = ctx.createOscillator(), g2 = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(800, t + 3);
+    g2.gain.setValueAtTime(0.08, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 3.5);
+    osc.connect(g2); g2.connect(master);
+    osc.start(t); osc.stop(t + 3.5);
   }
 
-  class Contact {
-    constructor(x, y, depth, source, strength, detector) {
-      this.x = x; this.y = y; this.depth = depth;
-      this.source = source; // 'passive' | 'active' | 'decoy'
-      this.strength = strength;
-      this.detector = detector;
-      this.age = 0;
-      this.id = 'C' + p.floor(p.random(1000));
-      this.classification = this._classify();
-      this.lastUpdate = 0;
-      this.uncertaintyRadius = 300;
-      this.isDecoy = false;
-      this.realTarget = null;
+  function playExplosion(dist = 1) {
+    if (!ctx) return;
+    let t = now();
+    let buf = ctx.createBuffer(1, ctx.sampleRate * 1.5, ctx.sampleRate);
+    let d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      let env = Math.exp(-i / (ctx.sampleRate * 0.15));
+      d[i] = (Math.random() * 2 - 1) * env * 0.7 + Math.sin(i * 0.01) * env * 0.3;
     }
-
-    _classify() {
-      // Returns probability distribution
-      if (this.source === 'decoy') {
-        return { hostile: 0.05, wreck: 0.05, decoy: 0.75, biologic: 0.10, anomaly: 0.05 };
-      }
-      // Based on signal strength and environment
-      let s = this.strength;
-      let base = {
-        hostile: s * 0.6,
-        wreck: (1 - s) * 0.4,
-        decoy: 0.05,
-        biologic: 0.1,
-        anomaly: 0.05,
-      };
-      // Normalize
-      let sum = Object.values(base).reduce((a, b) => a + b, 0);
-      for (let k in base) base[k] /= sum;
-      return base;
-    }
-
-    updateClarity(detectorSub, allEnemies) {
-      if (!detectorSub) return;
-      let dist = p.dist(detectorSub.x, detectorSub.y, this.x, this.y);
-      let depthDiff = Math.abs(detectorSub.depth - this.depth);
-
-      // Clarity improves with proximity and sensor quality
-      let clarity = Math.max(0, 1 - dist / 4000) * detectorSub.passiveSensitivity;
-      if (depthDiff > 100) clarity *= 0.5;
-      if (detectorSub._inThermalLayer() !== 
-          (this.depth >= CFG.DEPTH_THERMAL_TOP && this.depth <= CFG.DEPTH_THERMAL_BOT)) {
-        clarity *= 0.4;
-      }
-      if (detectorSub.sonarDamaged) clarity *= 0.5;
-
-      this.strength = clarity;
-      this.uncertaintyRadius = 300 * (1 - clarity) + 50;
-    }
+    let src = ctx.createBufferSource(), gain = ctx.createGain();
+    src.buffer = buf;
+    gain.gain.value = Math.max(0.1, 0.6 / (dist * 0.3 + 1));
+    src.connect(gain); gain.connect(master);
+    src.start(t);
   }
 
-  // ── WORLD GENERATION ───────────────────────────────────────
+  function playCreak() {
+    if (!ctx) return;
+    let t = now();
+    let osc = ctx.createOscillator(), gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(60 + Math.random() * 40, t);
+    osc.frequency.linearRampToValueAtTime(30 + Math.random() * 50, t + 2);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.05, t + 0.3);
+    gain.gain.linearRampToValueAtTime(0, t + 2.5);
+    osc.connect(gain); gain.connect(master);
+    osc.start(t); osc.stop(t + 2.6);
+  }
 
-  function generateTerrain() {
-    terrain = [];
-    // Wrecks
-    for (let i = 0; i < 8; i++) {
-      terrain.push({
-        type: 'wreck', x: p.random(400, 3600), y: p.random(400, 3600),
-        r: p.random(60, 150), depth: p.random(100, 400),
-        name: ['SS Valhalla', 'UNS Triton', 'K-141 Memorial', 'Deep Hauler', 
-               'Ore Freighter', 'Research Lab', 'Naval Debris', 'Unknown Hull'][i],
-      });
-    }
-    // Trenches
+  function playTorpedoWarning() {
+    if (!ctx) return;
+    let t = now();
     for (let i = 0; i < 3; i++) {
-      terrain.push({
-        type: 'trench', x: p.random(500, 3500), y: p.random(500, 3500),
-        w: p.random(200, 500), h: p.random(80, 180),
-        depth: p.random(300, 550),
-        name: ['Abyssal Trench', 'Devil\'s Gorge', 'The Scar'][i],
-      });
-    }
-    // Reefs
-    for (let i = 0; i < 5; i++) {
-      terrain.push({
-        type: 'reef', x: p.random(300, 3700), y: p.random(300, 3700),
-        r: p.random(80, 200), depth: p.random(80, 250),
-      });
-    }
-    // Vents
-    for (let i = 0; i < 4; i++) {
-      terrain.push({
-        type: 'vent', x: p.random(300, 3700), y: p.random(300, 3700),
-        r: p.random(40, 100), depth: p.random(350, 600),
-      });
+      let osc = ctx.createOscillator(), gain = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.15, t + i * 0.4);
+      gain.gain.setValueAtTime(0, t + i * 0.4 + 0.15);
+      osc.connect(gain); gain.connect(master);
+      osc.start(t + i * 0.4); osc.stop(t + i * 0.4 + 0.2);
     }
   }
 
-  function spawnEnemies() {
-    enemies = [];
-    let types = mission.enemyTypes || ['hunter', 'stealth', 'leviathan'];
-    for (let i = 0; i < types.length; i++) {
-      let angle = p.random(0, Math.PI * 2);
-      let dist = p.random(1200, 2500);
-      let ex = state.player.x + Math.cos(angle) * dist;
-      let ey = state.player.y + Math.sin(angle) * dist;
-      ex = p.constrain(ex, 200, CFG.MAP_W - 200);
-      ey = p.constrain(ey, 200, CFG.MAP_H - 200);
-
-      let subClass = types[i];
-      let edepth = subClass === 'stealth' ? p.random(200, 400) : p.random(100, 350);
-      let name = subClass === 'hunter' ? 'Akula-II' : 
-                 (subClass === 'stealth' ? 'Yasen-M' : 
-                  (subClass === 'ace' ? 'K-561 "Ghost"' : 'Typhoon'));
-      let enemy = new Submarine(ex, ey, edepth, p.random(0, Math.PI * 2), false, name, subClass);
-      enemy.aiState = 'patrol';
-      enemy.targetSpeed = 3 + p.random(3);
-      enemies.push(enemy);
-    }
-  }
-
-  // ── EFFECTS ────────────────────────────────────────────────
-
-  function spawnExplosion(x, y, depth) {
-    for (let i = 0; i < 20; i++) {
-      particles.push({
-        x, y, depth,
-        vx: p.random(-3, 3), vy: p.random(-3, 3),
-        life: 1.0, decay: p.random(0.3, 0.8),
-        color: [255, p.random(100, 200), p.random(0, 60)],
-        size: p.random(3, 8),
-      });
-    }
-  }
-
-  let screenShakeAmount = 0;
-  function triggerScreenShake(amount) {
-    screenShakeAmount = Math.max(screenShakeAmount, amount);
-  }
-
-  function addCallout(text, type) {
-    crewCallouts.push({ text, type, life: 5.0, maxLife: 5.0 });
-    if (crewCallouts.length > 6) crewCallouts.shift();
-  }
-
-  // ── AMBIENT PARTICLES ──────────────────────────────────────
-  let ambientParticles = [];
-  function initAmbientParticles() {
-    ambientParticles = [];
-    for (let i = 0; i < 80; i++) {
-      ambientParticles.push({
-        x: p.random(0, CFG.MAP_W), y: p.random(0, CFG.MAP_H),
-        depth: p.random(10, 700),
-        size: p.random(0.5, 2.5),
-        speed: p.random(0.1, 0.5),
-        alpha: p.random(20, 60),
-      });
-    }
-  }
-
-  // ── PROBABILITY COMPUTATION ────────────────────────────────
-
-  function computeDetectionProbability(detector, target) {
-    if (!detector || !target) return 0;
-    let dist = p.dist(detector.x, detector.y, target.x, target.y);
-    if (dist > 4000) return 0;
-    let baseDetect = target.detectability * (1 - dist / 4000);
-    let sensorFactor = detector.passiveSensitivity;
-    let depthFactor = 1.0;
-    if (Math.abs(detector.depth - target.depth) > 150) depthFactor = 0.6;
-    // Thermal layer blocking
-    let detInLayer = detector._inThermalLayer();
-    let tgtInLayer = target._inThermalLayer();
-    if (detInLayer !== tgtInLayer) depthFactor *= 0.3;
-    if (detector.sonarDamaged) sensorFactor *= 0.5;
-    return Math.min(baseDetect * sensorFactor * depthFactor, 0.99);
-  }
-
-  function computeHitProbability(shooter, target, torpedoType) {
-    let dist = p.dist(shooter.x, shooter.y, target.x, target.y);
-    if (dist > CFG.TORPEDO_RANGE) return 0;
-    let base = 0.7;
-    // Range degrades hit chance
-    base *= 1 - dist / CFG.TORPEDO_RANGE * 0.5;
-    // Target speed
-    base *= 1 - target.speed / CFG.MAX_SPEED * 0.4;
-    // Target awareness (if they're evading)
-    if (target.aiState === 'evade') base *= 0.6;
-    // Aspect angle
-    let angleToTarget = Math.atan2(target.y - shooter.y, target.x - shooter.x);
-    let aspectDiff = Math.abs(angleToTarget - target.heading);
-    while (aspectDiff > Math.PI) aspectDiff -= 2 * Math.PI;
-    if (aspectDiff > Math.PI / 2) base *= 0.7; // stern aspect = harder
-    // Thermal layer blocking
-    if (shooter._inThermalLayer() !== target._inThermalLayer()) base *= 0.7;
-    // Torpedo type
-    if (torpedoType === 'guided') base *= 1.1;
-    if (torpedoType === 'unguided') base *= 0.85;
-    // Decoys in water reduce chance
-    if (decoys.some(d => d.alive && d.owner === target)) base *= 0.7;
-
-    return Math.max(0.05, Math.min(base, 0.95));
-  }
-
-  function computeDecoySuccess(player, decoy) {
-    let base = CFG.DECOY_EFFECTIVENESS;
-    let dist = p.dist(player.x, player.y, decoy.x, decoy.y);
-    if (dist > 500) base *= 0.5;
-    if (player._inThermalLayer()) base *= 1.25;
-    if (player.speed < 3) base *= 1.3; // silent running helps decoy work
-    return Math.min(base, 0.95);
-  }
-
-  // ── MISSION SYSTEM ─────────────────────────────────────────
-
-  const MISSIONS = [
-    {
-      name: 'Operation: Wreck Diver',
-      type: 'hunt',
-      brief: 'Hostile Akula-class hunter-killer patrolling Wreck Alley. Intel suggests aggressive captain. Eliminate the target and return to base. Thermal layer at 150-280m. Use terrain for cover.',
-      enemyTypes: ['hunter'],
-      objective: 'Eliminate all hostiles',
-      success: () => enemies.every(e => e.hull <= 0),
-    },
-    {
-      name: 'Operation: Shadow Protocol',
-      type: 'hunt',
-      brief: 'Two contacts in sector: a Yasen-class stealth predator and a Typhoon-class leviathan. The stealth sub is the priority — it will stalk you. The leviathan is slow but heavily armored. Divide and conquer.',
-      enemyTypes: ['stealth', 'leviathan'],
-      objective: 'Eliminate all hostiles',
-      success: () => enemies.every(e => e.hull <= 0),
-    },
-    {
-      name: 'Operation: Ghost Hunt',
-      type: 'boss',
-      brief: 'K-561 "Ghost" — Captain Morozov, callsign "Echo." He knows our tactics. He adapts. He uses decoys that sound like our boats. This is a trap, and we are springing it. Stay alert. Trust nothing.',
-      enemyTypes: ['ace', 'hunter'],
-      objective: 'Eliminate the Ace',
-      success: () => enemies.find(e => e.subClass === 'ace').hull <= 0,
-    },
-  ];
-
-  function startMission(num) {
-    missionNum = num;
-    mission = MISSIONS[num];
-    gameTime = 0;
-    simTime = 0;
-    enemies = [];
-    torpedoes = [];
-    decoys = [];
-    contacts = [];
-    particles = [];
-    crewCallouts = [];
-    activePingTimer = 0;
-    activePingPos = null;
-    selectedContact = null;
-
-    state.player = new Submarine(CFG.MAP_W / 2, CFG.MAP_H / 2, 200, -Math.PI / 4, true, 'Kestrel', 'player');
-    generateTerrain();
-    initAmbientParticles();
-    screenShakeAmount = 0;
-    spawnEnemies();
-    addCallout('All systems nominal. Running silent.', 'text');
-    addCallout(`Mission: ${mission.name}`, 'text');
-    addCallout('Passive sonar online. No contacts yet.', 'text');
-    gamePhase = 'playing';
-  }
-
-  function checkMissionComplete() {
-    if (!mission || gamePhase !== 'playing') return;
-    if (mission.success()) {
-      gamePhase = 'debriefing';
-      addCallout('MISSION COMPLETE. All objectives achieved.', 'success');
-      // Grant upgrade
-      if (missionNum < MISSIONS.length - 1) {
-        let upgradeOptions = [
-          'Enhanced Passive Array (+15% classification)',
-          'Silent Pumpjet (-20% noise at cruise)',
-          'Wire Guidance Upgrade (longer wire range)',
-          'Reinforced Hull (+25 max hull)',
-          'Decoy Pattern Library (decoys last 33% longer)',
-        ];
-        upgrades.push(upgradeOptions[missionNum % upgradeOptions.length]);
-      }
-    }
-    // Check player death
-    if (state.player && state.player.hull <= 0) {
-      gamePhase = 'gameover';
-      addCallout('HULL CRITICAL. The Kestrel is lost.', 'danger');
-    }
-  }
-
-  // ── SIMULATION ─────────────────────────────────────────────
-
-  function simulate(dt) {
-    if (gamePhase !== 'playing') return;
-    if (!state.player) return;
-
-    gameTime += dt;
-    let psub = state.player;
-
-    // Update player
-    psub.update(dt);
-
-    // Update enemies
-    for (let e of enemies) {
-      if (e.hull <= 0) continue;
-      e.update(dt);
-    }
-
-    // Update torpedoes
-    for (let t of torpedoes) {
-      if (t.alive) t.update(dt);
-    }
-    torpedoes = torpedoes.filter(t => t.alive);
-
-    // Update decoys
-    for (let d of decoys) {
-      if (d.alive) d.update(dt);
-    }
-    decoys = decoys.filter(d => d.alive);
-
-    // Update particles
-    for (let pt of particles) {
-      pt.x += pt.vx; pt.y += pt.vy;
-      pt.life -= pt.decay * dt;
-    }
-    particles = particles.filter(pt => pt.life > 0);
-
-    // Update ambient particles (marine snow)
-    for (let ap of ambientParticles) {
-      ap.y += ap.speed * 0.1 * dt;
-      ap.x += Math.sin(gameTime * 0.3 + ap.depth * 0.01) * 0.2 * dt;
-      if (ap.y > CFG.MAP_H) { ap.y = 0; ap.x = p.random(0, CFG.MAP_W); }
-      if (ap.x > CFG.MAP_W) ap.x = 0;
-      if (ap.x < 0) ap.x = CFG.MAP_W;
-    }
-
-    // Screen shake decay
-    if (screenShakeAmount > 0) screenShakeAmount = Math.max(0, screenShakeAmount - dt * 3);
-
-    // Update contacts periodically
-    simTime += dt;
-    if (simTime >= CFG.CONTACT_UPDATE_INTERVAL) {
-      simTime = 0;
-      updateContacts();
-    }
-
-    // Update crew callout lifetimes
-    for (let c of crewCallouts) c.life -= dt;
-    crewCallouts = crewCallouts.filter(c => c.life > 0);
-
-    // Check mission complete
-    checkMissionComplete();
-
-    // Update sonar waterfall
-    sonarWaterfall.push(generateWaterfallLine());
-    if (sonarWaterfall.length > waterfallMax) sonarWaterfall.shift();
-  }
-
-  function updateContacts() {
-    let psub = state.player;
-    if (!psub) return;
-
-    // Clear old contacts, keep fresh ones
-    contacts = contacts.filter(c => c.age < 30);
-    // Remove contacts for dead/missing targets
-    contacts = contacts.filter(c => {
-      if (!c.realTarget) return true;
-      if (c.realTarget.hull !== undefined && c.realTarget.hull <= 0) return false;
-      if (c.realTarget.alive === false) return false;
-      return true;
-    });
-
-    // Generate contacts from enemies
-    for (let e of enemies) {
-      if (e.hull <= 0) continue;
-      let detectProb = computeDetectionProbability(psub, e);
-      if (detectProb > 0.15) {
-        // Add noise to position
-        let noiseX = p.random(-1, 1) * (1 - detectProb) * 500;
-        let noiseY = p.random(-1, 1) * (1 - detectProb) * 500;
-        let existingContact = contacts.find(c => c.realTarget === e);
-        if (existingContact) {
-          existingContact.x = e.x + noiseX;
-          existingContact.y = e.y + noiseY;
-          existingContact.depth = e.depth;
-          existingContact.strength = detectProb;
-          existingContact.age = 0;
-          existingContact.lastUpdate = gameTime;
-          existingContact.updateClarity(psub, enemies);
-        } else {
-          let c = new Contact(e.x + noiseX, e.y + noiseY, e.depth, 'passive', detectProb, psub);
-          c.realTarget = e;
-          c.isDecoy = false;
-          contacts.push(c);
-        }
-      }
-    }
-
-    // Generate contacts from decoys
-    for (let d of decoys) {
-      if (!d.alive) continue;
-      let detectProb = 0.5;
-      let existingContact = contacts.find(c => c.realTarget === d);
-      if (existingContact) {
-        existingContact.x = d.x + p.random(-200, 200);
-        existingContact.y = d.y + p.random(-200, 200);
-        existingContact.strength = detectProb;
-        existingContact.age = 0;
-      } else {
-        let c = new Contact(d.x + p.random(-200, 200), d.y + p.random(-200, 200), d.depth, 'decoy', detectProb, psub);
-        c.realTarget = d;
-        c.isDecoy = true;
-        c.classification = { hostile: d.isFakePlayer ? 0.45 : 0.15, wreck: 0.05, decoy: 0.5, biologic: 0.15, anomaly: 0.15 };
-        contacts.push(c);
-      }
-    }
-
-    // Ambient false contacts (especially with damaged sonar)
-    if (psub.sonarDamaged && p.random() < 0.3) {
-      let fc = new Contact(
-        psub.x + p.random(-2000, 2000),
-        psub.y + p.random(-2000, 2000),
-        psub.depth + p.random(-100, 100),
-        'passive', 0.08, psub
-      );
-      fc.classification = { hostile: 0.1, wreck: 0.5, decoy: 0.05, biologic: 0.2, anomaly: 0.15 };
-      contacts.push(fc);
-    }
-
-    // Age contacts
-    for (let c of contacts) c.age += CFG.CONTACT_UPDATE_INTERVAL;
-  }
-
-  function generateWaterfallLine() {
-    let line = new Array(120).fill(0);
-    let psub = state.player;
-    if (!psub) return line;
-
-    // Map contacts to frequency bands
-    for (let c of contacts) {
-      if (c.strength < 0.1) continue;
-      let bearing = Math.atan2(c.y - psub.y, c.x - psub.x);
-      let bearingDeg = ((bearing * 180 / Math.PI) + 360) % 360;
-      let band = Math.floor(bearingDeg / 3); // 120 bands = 3° each
-      if (band >= 0 && band < 120) {
-        line[band] = Math.max(line[band], c.strength);
-      }
-    }
-    // Active ping artifact
-    if (activePingTimer > 0 && activePingTimer > CFG.ACTIVE_PING_REVEAL_TIME - 2) {
-      for (let i = 0; i < 120; i++) line[i] = Math.max(line[i], 0.6);
-    }
-    return line;
-  }
-
-  // ── RENDERING ──────────────────────────────────────────────
-
-  function drawTacticalMap() {
-    let mapX = 0, mapY = 0;
-    let mapW = p.width * 0.65;
-    let mapH = p.height * 0.72;
-
-    let pg = RB.map;
-    pg.clear(); pg.background(COL.bg);
-
-    // Transform: center on player
-    let psub = state.player;
-    let cx = psub ? psub.x : CFG.MAP_W / 2;
-    let cy = psub ? psub.y : CFG.MAP_H / 2;
-    let scale = zoom * 0.18;
-
-    pg.push();
-    pg.translate(mapW / 2, mapH / 2);
-    pg.scale(scale);
-    pg.translate(-cx, -cy);
-
-    // Draw terrain
-    for (let t of terrain) {
-      if (t.type === 'wreck') {
-        pg.fill(COL.wreck[0], COL.wreck[1], COL.wreck[2], 120);
-        pg.noStroke();
-        pg.ellipse(t.x, t.y, t.r * 2);
-        // Wreck detail
-        pg.stroke(COL.wreck[0] + 20, COL.wreck[1] + 10, COL.wreck[2] + 10, 80);
-        pg.strokeWeight(1);
-        pg.noFill();
-        pg.ellipse(t.x, t.y, t.r * 1.4);
-        pg.ellipse(t.x + 15, t.y - 10, t.r * 0.6);
-      } else if (t.type === 'trench') {
-        pg.fill(COL.trench[0], COL.trench[1], COL.trench[2], 150);
-        pg.noStroke();
-        pg.rect(t.x - t.w / 2, t.y - t.h / 2, t.w, t.h, 20);
-        pg.stroke(COL.trench[0] + 15, COL.trench[1] + 10, COL.trench[2] + 10, 100);
-        pg.strokeWeight(2);
-        pg.noFill();
-        pg.rect(t.x - t.w / 2, t.y - t.h / 2, t.w, t.h, 20);
-      } else if (t.type === 'reef') {
-        pg.fill(COL.terrain[0], COL.terrain[1] + 10, COL.terrain[2], 100);
-        pg.noStroke();
-        pg.ellipse(t.x, t.y, t.r * 2);
-        for (let i = 0; i < 5; i++) {
-          pg.ellipse(t.x + p.random(-t.r * 0.6, t.r * 0.6), 
-                     t.y + p.random(-t.r * 0.6, t.r * 0.6), 
-                     t.r * 0.4 + p.random(t.r * 0.3));
-        }
-      } else if (t.type === 'vent') {
-        pg.fill(80, 30, 10, 100);
-        pg.noStroke();
-        pg.ellipse(t.x, t.y, t.r * 2);
-        pg.fill(200, 80, 20, 50);
-        pg.ellipse(t.x, t.y, t.r * 0.6);
-      }
-    }
-
-    // Draw thermal layer indicator (subtle)
-    pg.noFill();
-    pg.stroke(COL.thermal[0], COL.thermal[1], COL.thermal[2], 30);
-    pg.strokeWeight(20);
-    pg.strokeWeight(0);
-    pg.drawingContext.setLineDash = undefined;
-
-    // Draw decoys
-    for (let d of decoys) {
-      if (!d.alive) continue;
-      let alpha = d.age / d.lifetime < 0.8 ? 150 : 150 * (1 - (d.age - 0.8 * d.lifetime) / (0.2 * d.lifetime));
-      pg.fill(COL.decoy[0], COL.decoy[1], COL.decoy[2], alpha);
-      pg.stroke(COL.decoy[0], COL.decoy[1], COL.decoy[2], alpha * 0.5);
-      pg.strokeWeight(1.5);
-      pg.ellipse(d.x, d.y, 30);
-      pg.strokeWeight(0.5);
-      pg.ellipse(d.x, d.y, 60);
-    }
-
-    // Draw contacts (uncertainty ellipses)
-    for (let c of contacts) {
-      if (c.strength < 0.1) continue;
-      let alpha = 150;
-      // Color based on classification
-      let r = COL.contact[0], g = COL.contact[1], b = COL.contact[2];
-      if (c.classification.hostile > 0.5) { r = COL.enemy[0]; g = COL.enemy[1]; b = COL.enemy[2]; }
-      else if (c.classification.decoy > 0.4) { r = COL.decoy[0]; g = COL.decoy[1]; b = COL.decoy[2]; }
-      else if (c.classification.wreck > 0.4) { r = 150; g = 150; b = 160; }
-
-      let ur = c.uncertaintyRadius;
-      pg.noFill();
-      pg.stroke(r, g, b, alpha);
-      pg.strokeWeight(2);
-      pg.ellipse(c.x, c.y, ur * 2);
-      // Smaller inner ellipse
-      pg.stroke(r, g, b, alpha * 0.6);
-      pg.strokeWeight(1);
-      pg.ellipse(c.x, c.y, ur * 0.6);
-      // Contact ID
-      pg.fill(r, g, b, alpha);
-      pg.noStroke();
-      pg.textAlign(pg.CENTER);
-      pg.textSize(12);
-      pg.text(c.id, c.x, c.y - ur - 10);
-    }
-
-    // Draw torpedoes
-    for (let t of torpedoes) {
-      if (!t.alive) continue;
-      pg.stroke(COL.torpedo[0], COL.torpedo[1], COL.torpedo[2], 200);
-      pg.strokeWeight(2);
-      pg.noFill();
-      let tx = t.x - Math.cos(t.heading) * 20;
-      let ty = t.y - Math.sin(t.heading) * 20;
-      pg.line(tx, ty, t.x, t.y);
-      // Trail
-      pg.stroke(COL.torpedo[0], COL.torpedo[1], COL.torpedo[2], 80);
-      pg.strokeWeight(1);
-      pg.line(tx - Math.cos(t.heading) * 40, ty - Math.sin(t.heading) * 40, tx, ty);
-    }
-
-    // Draw enemies
-    for (let e of enemies) {
-      if (e.hull <= 0) continue;
-      // Only draw if player could reasonably see them (or for debugging)
-      let dist = psub ? p.dist(psub.x, psub.y, e.x, e.y) : 0;
-      let alpha = 200;
-      if (dist > 2000) alpha = p.map(dist, 2000, 4000, 200, 40);
-
-      pg.push();
-      pg.translate(e.x, e.y);
-      pg.rotate(e.heading);
-      pg.fill(COL.enemy[0], COL.enemy[1], COL.enemy[2], alpha);
-      pg.noStroke();
-      pg.triangle(20, 0, -12, -8, -12, 8);
-      // Hull indicator
-      pg.fill(255, 255, 255, alpha * 0.3);
-      pg.ellipse(0, 0, 35, 12);
-      pg.pop();
-    }
-
-    // Draw player submarine
-    if (psub) {
-      pg.push();
-      pg.translate(psub.x, psub.y);
-      pg.rotate(psub.heading);
-      pg.fill(COL.player[0], COL.player[1], COL.player[2]);
-      pg.noStroke();
-      pg.triangle(24, 0, -14, -10, -14, 10);
-      // Hull
-      pg.fill(COL.player[0], COL.player[1], COL.player[2], 60);
-      pg.ellipse(0, 0, 40, 16);
-      // Engine glow
-      if (psub.speed > 10) {
-        pg.fill(100, 200, 255, 100);
-        pg.ellipse(-16, 0, 8, 6);
-      }
-      pg.pop();
-    }
-
-    // Draw particles
-    for (let pt of particles) {
-      pg.fill(pt.color[0], pt.color[1], pt.color[2], pt.life * 200);
-      pg.noStroke();
-      pg.ellipse(pt.x, pt.y, pt.size * pt.life);
-    }
-
-    pg.pop();
-
-    // Draw ambient marine snow
-    for (let ap of ambientParticles) {
-      pg.fill(180, 200, 220, ap.alpha * 0.3);
-      pg.noStroke();
-      pg.ellipse(ap.x, ap.y, ap.size);
-    }
-
-    // Draw grid
-    pg.stroke(COL.panelBorder[0], COL.panelBorder[1], COL.panelBorder[2], 20);
-    pg.strokeWeight(0.5);
-    let gridSize = 500 / scale;
-    let startX = cx - (mapW / 2) / scale;
-    let startY = cy - (mapH / 2) / scale;
-    startX = Math.floor(startX / gridSize) * gridSize;
-    startY = Math.floor(startY / gridSize) * gridSize;
-    for (let gx = startX; gx < cx + (mapW / 2) / scale; gx += gridSize) {
-      let sx = mapW / 2 + (gx - cx) * scale;
-      if (sx >= 0 && sx <= mapW) pg.line(sx, 0, sx, mapH);
-    }
-    for (let gy = startY; gy < cy + (mapH / 2) / scale; gy += gridSize) {
-      let sy = mapH / 2 + (gy - cy) * scale;
-      if (sy >= 0 && sy <= mapH) pg.line(0, sy, mapW, sy);
-    }
-
-    // Compass rose
-    pg.fill(COL.text[0], COL.text[1], COL.text[2], 150);
-    pg.noStroke();
-    pg.textAlign(pg.CENTER);
-    pg.textSize(14);
-    pg.text('N', mapW - 20, 20);
-
-    // Apply screen shake to map
-    let shakeX = 0, shakeY = 0;
-    if (screenShakeAmount > 0.01) {
-      shakeX = (Math.random() - 0.5) * screenShakeAmount * 30;
-      shakeY = (Math.random() - 0.5) * screenShakeAmount * 30;
-    }
-    p.image(pg, mapX + shakeX, mapY + shakeY);
-  }
-
-  function drawSonarWaterfall() {
-    let sx = 0;
-    let sy = p.height * 0.72;
-    let sw = p.width * 0.65;
-    let sh = p.height * 0.28;
-
-    let pg = RB.sonar;
-    pg.clear(); pg.background(COL.panel);
-
-    // Waterfall
-    let barW = sw / 120;
-    for (let row = 0; row < sonarWaterfall.length; row++) {
-      let y = sh - (row + 1) * (sh / waterfallMax);
-      let line = sonarWaterfall[row];
-      for (let col = 0; col < 120; col++) {
-        let val = line[col];
-        if (val < 0.05) continue;
-        let bright = val * 200;
-        pg.fill(COL.contact[0], COL.contact[1], COL.contact[2], bright);
-        pg.noStroke();
-        pg.rect(col * barW, y, barW, sh / waterfallMax);
-      }
-    }
-
-    // Labels
-    pg.fill(COL.text[0], COL.text[1], COL.text[2], 120);
-    pg.textSize(10);
-    pg.textAlign(pg.CENTER);
-    pg.text('000°', sw * 0.0 + 20, sh - 5);
-    pg.text('090°', sw * 0.25, sh - 5);
-    pg.text('180°', sw * 0.5, sh - 5);
-    pg.text('270°', sw * 0.75, sh - 5);
-
-    // Border
-    pg.stroke(COL.panelBorder[0], COL.panelBorder[1], COL.panelBorder[2], 100);
-    pg.strokeWeight(1);
-    pg.noFill();
-    pg.rect(0, 0, sw, sh);
-
-    // Title
-    pg.fill(COL.text[0], COL.text[1], COL.text[2], 150);
-    pg.textSize(11);
-    pg.textAlign(pg.LEFT);
-    pg.text('SONAR WATERFALL', 8, 14);
-
-    p.image(pg, sx, sy);
-  }
-
-  function drawContactPanel() {
-    let px = p.width * 0.65;
-    let py = 0;
-    let pw = p.width * 0.35;
-    let ph = p.height * 0.5;
-
-    let pg = RB.contacts;
-    pg.clear(); pg.background(COL.panel);
-
-    // Title
-    pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-    pg.textSize(12);
-    pg.textAlign(pg.LEFT);
-    pg.text('CONTACT BOARD', 10, 18);
-
-    // Contacts
-    pg.textSize(10);
-    let cy = 40;
-    for (let i = 0; i < contacts.length; i++) {
-      let c = contacts[i];
-      if (c.strength < 0.1) continue;
-      if (cy > ph - 20) break;
-
-      let isSelected = selectedContact === c;
-      if (isSelected) {
-        pg.fill(COL.player[0], COL.player[1], COL.player[2], 40);
-        pg.noStroke();
-        pg.rect(4, cy - 12, pw - 8, 50);
-      }
-
-      pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-      pg.textAlign(pg.LEFT);
-      let label = `${c.id} | BRG ${Math.round((Math.atan2(c.y - state.player.y, c.x - state.player.x) * 180 / Math.PI + 360) % 360)}°`;
-      pg.text(label, 10, cy);
-
-      cy += 14;
-      let cls = c.classification;
-      let dominant = Object.entries(cls).sort((a, b) => b[1] - a[1])[0];
-      let pct = Math.round(dominant[1] * 100);
-      let clr = COL.contact;
-      if (dominant[0] === 'hostile' && pct > 50) clr = COL.enemy;
-      else if (dominant[0] === 'decoy' && pct > 40) clr = COL.decoy;
-      pg.fill(clr[0], clr[1], clr[2]);
-      pg.text(`${pct}% ${dominant[0]}`, 10, cy);
-
-      cy += 14;
-      pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-      let rng = Math.round(p.dist(c.x, c.y, state.player.x, state.player.y));
-      pg.text(`RNG ~${rng}m | Depth ~${Math.round(c.depth)}m`, 10, cy);
-      cy += 20;
-    }
-
-    if (contacts.length === 0) {
-      pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-      pg.text('No contacts detected.', 10, cy);
-    }
-
-    // Border
-    pg.stroke(COL.panelBorder[0], COL.panelBorder[1], COL.panelBorder[2], 100);
-    pg.strokeWeight(1);
-    pg.noFill();
-    pg.rect(0, 0, pw, ph);
-
-    p.image(pg, px, py);
-  }
-
-  function drawStatusPanel() {
-    let px = p.width * 0.65;
-    let py = p.height * 0.5;
-    let pw = p.width * 0.35;
-    let ph = p.height * 0.5;
-
-    let pg = RB.status;
-    pg.clear(); pg.background(COL.panel);
-    let psub = state.player;
-    if (!psub) { p.image(pg, px, py); return; }
-
-    let y = 18;
-    pg.textSize(12);
-    pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-    pg.textAlign(pg.LEFT);
-    pg.text('STATUS', 10, y); y += 20;
-
-    pg.textSize(10);
-    // Speed
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`Speed: ${Math.round(psub.speed)} kts`, 10, y);
-    let spdLabel = psub.speed < 2 ? 'SILENT' : psub.speed < 6 ? 'CREEP' : psub.speed < 14 ? 'CRUISE' : 'FLANK';
-    pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-    pg.text(spdLabel, 120, y); y += 16;
-
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`Depth: ${Math.round(psub.depth)}m`, 10, y);
-    if (psub._inThermalLayer()) {
-      pg.fill(COL.thermal[0], COL.thermal[1], COL.thermal[2]);
-      pg.text('LAYER', 120, y);
-    }
-    y += 16;
-
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`Heading: ${Math.round((psub.heading * 180 / Math.PI + 360) % 360)}°`, 10, y);
-    y += 16;
-
-    // Detectability
-    let detect = Math.round(psub.detectability * 100);
-    let dClr = detect < 20 ? COL.probHi : detect < 50 ? COL.probMed : COL.probLo;
-    pg.fill(dClr[0], dClr[1], dClr[2]);
-    pg.text(`DETECTABILITY: ${detect}%`, 10, y); y += 20;
-
-    // Hull
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`Hull: ${Math.round(psub.hull)}%`, 10, y);
-    // Hull bar
-    let hullPct = psub.hull / psub.maxHull;
-    let hullClr = hullPct > 0.5 ? COL.probHi : hullPct > 0.25 ? COL.probMed : COL.probLo;
-    pg.fill(hullClr[0], hullClr[1], hullClr[2]);
-    pg.rect(80, y - 8, 100 * hullPct, 10);
-    pg.noFill();
-    pg.stroke(COL.textDim[0], COL.textDim[1], COL.textDim[2], 80);
-    pg.strokeWeight(1);
-    pg.rect(80, y - 8, 100, 10);
-    y += 20;
-
-    // Flooding
-    if (psub.flooding.some(f => f)) {
-      pg.fill(COL.flood[0], COL.flood[1], COL.flood[2]);
-      let comps = psub.flooding.map((f, i) => f ? `C${i+1}` : null).filter(Boolean).join(', ');
-      pg.text(`FLOODING: ${comps}`, 10, y); y += 16;
-    }
-
-    // Damage indicators
-    if (psub.sonarDamaged) {
-      pg.fill(COL.warning[0], COL.warning[1], COL.warning[2]);
-      pg.text('SONAR IMPAIRED', 10, y); y += 16;
-    }
-    if (psub.engineDamaged) {
-      pg.fill(COL.warning[0], COL.warning[1], COL.warning[2]);
-      pg.text('ENGINE DAMAGED +NOISE', 10, y); y += 16;
-    }
-    if (psub.onFire) {
-      pg.fill(COL.fire[0], COL.fire[1], COL.fire[2]);
-      pg.text(`FIRE! ${Math.round(psub.fireTimer)}s`, 10, y); y += 16;
-    }
-
-    y += 8;
-
-    // Weapons
-    pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-    pg.text('WEAPONS', 10, y); y += 16;
-    for (let i = 0; i < psub.tubes.length; i++) {
-      let t = psub.tubes[i];
-      let status = psub.tubeJammed[i] ? 'JAMMED' : t.loaded ? 'READY' : `RELOAD ${Math.round(t.reloadTimer)}s`;
-      let tClr = psub.tubeJammed[i] ? COL.danger : t.loaded ? COL.probHi : COL.probMed;
-      pg.fill(tClr[0], tClr[1], tClr[2]);
-      pg.text(`Tube ${i+1} [${t.type}]: ${status}`, 10, y);
-      if (i === psub.selectedTube) {
-        pg.fill(COL.player[0], COL.player[1], COL.player[2], 100);
-        pg.rect(8, y - 10, 3, 12);
-      }
-      y += 14;
-    }
-
-    y += 4;
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`Decoys: ${psub.decoys}${psub.decoyRackCrushed ? ' (RACK CRUSHED)' : ''}`, 10, y);
-
-    // Active ping status
-    if (activePingTimer > 0) {
-      y += 20;
-      pg.fill(COL.warning[0], COL.warning[1], COL.warning[2]);
-      pg.text(`PING EXPOSURE: ${Math.round(activePingTimer)}s`, 10, y);
-    }
-
-    // Border
-    pg.stroke(COL.panelBorder[0], COL.panelBorder[1], COL.panelBorder[2], 100);
-    pg.strokeWeight(1);
-    pg.noFill();
-    pg.rect(0, 0, pw, ph);
-
-    p.image(pg, px, py);
-  }
-
-  function drawProbabilityBar() {
-    let pg = RB.probBar;
-    pg.clear(); pg.background(COL.panel);
-
-    let psub = state.player;
-    if (!psub || !selectedContact || !selectedContact.realTarget) {
-      p.image(pg, 0, 0);
-      return;
-    }
-
-    let target = selectedContact.realTarget;
-    if (target.hull <= 0 || !target.update) {
-      p.image(pg, 0, 0);
-      return;
-    }
-
-    let hitProb = computeHitProbability(psub, target, psub.tubes[psub.selectedTube].type);
-    let detectProb = computeDetectionProbability(psub, target);
-    let enemyDetectUs = computeDetectionProbability(target, psub);
-    let enemyFireSol = enemyDetectUs > 0.5 ? 'LIKELY' : enemyDetectUs > 0.3 ? 'POSSIBLE' : 'UNLIKELY';
-    let enemyTorpedoInWater = torpedoes.some(t => t.owner && !t.owner.isPlayer && t.alive);
-
-    pg.textSize(10);
-    let x = 10;
-    // Hit probability
-    pg.fill(COL.text[0], COL.text[1], COL.text[2]);
-    pg.textAlign(pg.LEFT);
-    let hitClr = hitProb > 0.6 ? COL.probHi : hitProb > 0.35 ? COL.probMed : COL.probLo;
-    pg.fill(hitClr[0], hitClr[1], hitClr[2]);
-    pg.text(`═ HIT: ${Math.round(hitProb * 100)}%`, x, 20); x += 90;
-    
-    pg.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    pg.text(`│ DETECT: ${Math.round(detectProb * 100)}%`, x, 20); x += 90;
-
-    let eClr = enemyDetectUs > 0.5 ? COL.probLo : enemyDetectUs > 0.3 ? COL.probMed : COL.probHi;
-    pg.fill(eClr[0], eClr[1], eClr[2]);
-    pg.text(`│ ENEMY AWARE: ${Math.round(enemyDetectUs * 100)}%`, x, 20); x += 110;
-
-    pg.fill(enemyDetectUs > 0.4 ? COL.danger[0] : COL.textDim[0], 
-            enemyDetectUs > 0.4 ? COL.danger[1] : COL.textDim[1], 
-            enemyDetectUs > 0.4 ? COL.danger[2] : COL.textDim[2]);
-    pg.text(`│ FIRING SOL: ${enemyFireSol}`, x, 20);
-
-    if (enemyTorpedoInWater) {
-      let flash = Math.sin(gameTime * 5) * 0.5 + 0.5;
-      pg.fill(COL.danger[0], COL.danger[1], COL.danger[2], 100 + flash * 155);
-      pg.textSize(12);
-      pg.textAlign(pg.RIGHT);
-      pg.text('⚠ TORPEDO IN WATER ⚠', pg.width - 10, 20);
-    }
-
-    p.image(pg, 0, 0);
-  }
-
-  function drawCrewCallouts() {
-    let pg = RB.callouts;
-    pg.clear();
-    pg.textSize(11);
-
-    let y = 110;
-    for (let i = crewCallouts.length - 1; i >= 0; i--) {
-      let c = crewCallouts[i];
-      let alpha = Math.min(1, c.life / 1.5) * 200;
-      let clr = c.type === 'danger' ? COL.danger : 
-                c.type === 'warning' ? COL.warning :
-                c.type === 'success' ? COL.success : COL.text;
-      pg.fill(clr[0], clr[1], clr[2], alpha);
-      pg.textAlign(pg.LEFT);
-      pg.text(c.text, 10, y);
-      y -= 18;
-    }
-
-    p.image(pg, 10, p.height - 150);
-  }
-
-  function drawDepthIndicator() {
-    let pg = RB.depth;
-    pg.clear();
-    let psub = state.player;
-    if (!psub) { p.image(pg, p.width * 0.65 - 35, 0); return; }
-
-    let maxD = CFG.DEPTH_CRUSH + 150;
-    let y = p.map(psub.depth, 0, maxD, pg.height - 10, 10);
-    pg.fill(COL.player[0], COL.player[1], COL.player[2]);
-    pg.noStroke();
-    pg.rect(10, y - 2, 14, 4);
-
-    // Thermal layer
-    let tTop = p.map(CFG.DEPTH_THERMAL_TOP, 0, maxD, pg.height - 10, 10);
-    let tBot = p.map(CFG.DEPTH_THERMAL_BOT, 0, maxD, pg.height - 10, 10);
-    pg.fill(COL.thermal[0], COL.thermal[1], COL.thermal[2], 40);
-    pg.rect(0, tTop, 30, tBot - tTop);
-
-    // Crush depth
-    let cY = p.map(CFG.DEPTH_CRUSH, 0, maxD, pg.height - 10, 10);
-    pg.stroke(COL.danger[0], COL.danger[1], COL.danger[2], 100);
-    pg.strokeWeight(1);
-    pg.line(0, cY, 30, cY);
-
-    p.image(pg, p.width * 0.65 - 35, 0);
-  }
-
-  function drawOverlay() {
-    // Mission info
-    if (mission && gamePhase === 'playing') {
-      p.fill(COL.text[0], COL.text[1], COL.text[2], 150);
-      p.textSize(14);
-      p.textAlign(p.LEFT);
-      p.text(mission.name, p.width * 0.65 + 10, p.height - 25);
-      p.textSize(10);
-      p.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2], 120);
-      p.text(`TIME: ${Math.floor(gameTime / 60)}:${String(Math.floor(gameTime % 60)).padStart(2, '0')}`, p.width * 0.65 + 10, p.height - 10);
-    }
-
-    if (gamePhase === 'briefing') {
-      drawBriefing();
-    } else if (gamePhase === 'debriefing') {
-      drawDebriefing();
-    } else if (gamePhase === 'gameover') {
-      drawGameOver();
-    }
-  }
-
-  function drawBriefing() {
-    let w = p.width, h = p.height;
-    // Dark overlay
-    p.fill(0, 0, 0, 220);
-    p.rect(0, 0, w, h);
-
-    // Center panel
-    let pw = Math.min(w * 0.85, 600);
-    let ph = Math.min(h * 0.8, 500);
-    let px = (w - pw) / 2;
-    let py = (h - ph) / 2;
-    p.fill(COL.panel[0], COL.panel[1], COL.panel[2], 230);
-    p.stroke(COL.accent[0], COL.accent[1], COL.accent[2], 180);
-    p.strokeWeight(2);
-    p.rect(px, py, pw, ph, 8);
-    p.noStroke();
-
-    // Title
-    p.textAlign(p.CENTER);
-    p.textSize(Math.min(36, pw * 0.07));
-    p.fill(COL.accent[0], COL.accent[1], COL.accent[2]);
-    p.text('ECHO PROTOCOL', w / 2, py + 55);
-    p.textSize(Math.min(14, pw * 0.03));
-    p.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    p.text('BENTHIC COLD WAR — 2047', w / 2, py + 80);
-
-    // Divider
-    p.stroke(COL.accent[0], COL.accent[1], COL.accent[2], 100);
-    p.strokeWeight(1);
-    p.line(px + 30, py + 95, px + pw - 30, py + 95);
-    p.noStroke();
-
-    // Mission brief
-    p.textAlign(p.CENTER);
-    p.textSize(Math.min(13, pw * 0.025));
-    p.fill(COL.text[0], COL.text[1], COL.text[2]);
-    let brief = mission ? mission.brief : 'Select a mission to begin.';
-    let words = brief.split(' ');
-    let line = '';
-    let y = py + 120;
-    let maxLineW = pw * 0.8;
-    for (let wd of words) {
-      let test = line + wd + ' ';
-      if (p.textWidth(test) > maxLineW && line !== '') {
-        p.text(line.trim(), w / 2, y);
-        y += 22;
-        line = wd + ' ';
-      } else line = test;
-    }
-    if (line.trim()) p.text(line.trim(), w / 2, y);
-
-    // Controls summary (compact)
-    y = Math.max(y + 35, py + ph * 0.55);
-    p.textSize(Math.min(10, pw * 0.018));
-    p.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2]);
-    p.text('[W/S] Speed  [A/D] Turn  [Q/E] Depth  [SPACE] Ping', w / 2, y);
-    p.text('[F] Fire Torpedo  [T] Decoy  [TAB] Cycle Target  [1-3] Tube', w / 2, y + 18);
-
-    // Big ENTER prompt
-    y = py + ph - 50;
-    let pulse = Math.sin(Date.now() / 800) * 0.4 + 0.6;
-    p.textSize(Math.min(16, pw * 0.035));
-    p.fill(COL.probHi[0], COL.probHi[1], COL.probHi[2], Math.floor(120 + pulse * 135));
-    p.text('▶  PRESS ENTER TO START  ◀', w / 2, y);
-    p.textSize(Math.min(10, pw * 0.02));
-    p.fill(COL.textDim[0], COL.textDim[1], COL.textDim[2], 180);
-    p.text(`Mission ${missionNum + 1} of ${MISSIONS.length}`, w / 2, y + 22);
-  }
-
-  function drawDebriefing() {
-    let w = p.width, h = p.height;
-    p.fill(0, 0, 0, 200);
-    p.rect(0, 0, w, h);
-    // Center panel
-    let pw = Math.min(w * 0.7, 450);
-    let ph = 200;
-    p.fill(COL.panel[0], COL.panel[1], COL.panel[2], 230);
-    p.stroke(COL.success[0], COL.success[1], COL.success[2], 150);
-    p.strokeWeight(2);
-    p.rect((w - pw) / 2, (h - ph) / 2, pw, ph, 8);
-    p.noStroke();
-
-    p.textAlign(p.CENTER);
-    p.textSize(24);
-    p.fill(COL.success[0], COL.success[1], COL.success[2]);
-    p.text('MISSION COMPLETE', w / 2, h / 2 - 25);
-    p.textSize(13);
-    p.fill(COL.text[0], COL.text[1], COL.text[2]);
-    let upg = upgrades.length > 0 ? upgrades[upgrades.length - 1] : 'None';
-    p.text('Upgrade: ' + upg, w / 2, h / 2 + 15);
-
-    let pulse = Math.sin(Date.now() / 800) * 0.4 + 0.6;
-    p.fill(COL.probHi[0], COL.probHi[1], COL.probHi[2], Math.floor(120 + pulse * 135));
-    p.textSize(14);
-    p.text(missionNum < MISSIONS.length - 1 ? '▶ PRESS ENTER FOR NEXT MISSION ◀' : '▶ PRESS ENTER TO RESTART ◀', w / 2, h / 2 + 55);
-  }
-
-  function drawGameOver() {
-    let w = p.width, h = p.height;
-    p.fill(0, 0, 0, 200);
-    p.rect(0, 0, w, h);
-    let pw = Math.min(w * 0.7, 450);
-    let ph = 200;
-    p.fill(COL.panel[0], COL.panel[1], COL.panel[2], 230);
-    p.stroke(COL.danger[0], COL.danger[1], COL.danger[2], 150);
-    p.strokeWeight(2);
-    p.rect((w - pw) / 2, (h - ph) / 2, pw, ph, 8);
-    p.noStroke();
-
-    p.textAlign(p.CENTER);
-    p.textSize(24);
-    p.fill(COL.danger[0], COL.danger[1], COL.danger[2]);
-    p.text('HULL CRITICAL', w / 2, h / 2 - 30);
-    p.textSize(13);
-    p.fill(COL.text[0], COL.text[1], COL.text[2]);
-    p.text('The Kestrel is lost. The deep takes everything.', w / 2, h / 2 + 5);
-
-    let pulse = Math.sin(Date.now() / 800) * 0.4 + 0.6;
-    p.fill(COL.probHi[0], COL.probHi[1], COL.probHi[2], Math.floor(120 + pulse * 135));
-    p.textSize(14);
-    p.text('▶ PRESS ENTER TO RETRY ◀', w / 2, h / 2 + 55);
-  }
-
-  // ── MAIN p5.js LIFECYCLE ──────────────────────────────────
-
-  // Persistent render buffers (avoid createGraphics per frame)
-  let RB = {};
-  function initRenderBuffers() {
-    let mw = p.width * 0.65, mh = p.height * 0.72;
-    RB.map = p.createGraphics(mw, mh);
-    RB.sonar = p.createGraphics(mw, p.height * 0.28);
-    RB.contacts = p.createGraphics(p.width * 0.35, p.height * 0.5);
-    RB.status = p.createGraphics(p.width * 0.35, p.height * 0.5);
-    RB.probBar = p.createGraphics(p.width, 34);
-    RB.callouts = p.createGraphics(p.width * 0.5, 120);
-    RB.depth = p.createGraphics(30, p.height * 0.72);
-  }
-
-  p.setup = function() {
-    p.createCanvas(p.windowWidth, p.windowHeight);
-    p.pixelDensity(1);
-    p.frameRate(60);
-    p.textFont('monospace');
-    p.colorMode(p.RGB, 255, 255, 255, 255);
-    initRenderBuffers();
-
-    // Init game state
-    state.player = new Submarine(CFG.MAP_W / 2, CFG.MAP_H / 2, 200, -Math.PI / 4, true, 'Kestrel', 'player');
-    generateTerrain();
-    mission = MISSIONS[0];
-    gamePhase = 'briefing';
-    addCallout('ECHO PROTOCOL — All systems standby.', 'text');
-    addCallout('Press ENTER or tap screen to begin.', 'text');
-  };
-
-  // ── MOBILE TOUCH CONTROLS ──────────────────────────────
-  let touches = {};
-  p.touchStarted = function() {
-    // Tap anywhere on briefing/debriefing/gameover screens
-    if (gamePhase !== 'playing') {
-      if (gamePhase === 'briefing') startMission(missionNum);
-      else if (gamePhase === 'debriefing') {
-        if (missionNum < MISSIONS.length - 1) startMission(missionNum + 1);
-        else { upgrades = []; startMission(0); }
-      }
-      else if (gamePhase === 'gameover') { upgrades = []; startMission(missionNum); }
-      return false;
-    }
-    for (let t of p.touches) {
-      touches[t.id] = { x: t.x, y: t.y, startX: t.x, startY: t.y };
-    }
-    return false;
-  };
-  p.touchMoved = function() {
-    for (let t of p.touches) {
-      if (touches[t.id]) {
-        touches[t.id].x = t.x;
-        touches[t.id].y = t.y;
-      }
-    }
-    return false;
-  };
-  p.touchEnded = function() {
-    for (let t of p.touches) touches[t.id] = null;
-    // Clean up dead touches
-    let active = {};
-    for (let t of p.touches) active[t.id] = touches[t.id] || { x: t.x, y: t.y };
-    touches = active;
-    return false;
-  };
-
-  function drawMobileControls() {
-    let w = p.width, h = p.height;
-    let alpha = 120;
-    // Directional pad (bottom left)
-    let dpadX = 60, dpadY = h - 120, dpadR = 50;
-    p.fill(255, 255, 255, alpha * 0.3);
-    p.stroke(255, 255, 255, alpha);
-    p.strokeWeight(1.5);
-    p.ellipse(dpadX, dpadY, dpadR * 2);
-    // Direction arrows
-    p.fill(255, 255, 255, alpha);
-    p.noStroke();
-    p.textAlign(p.CENTER);
-    p.textSize(14);
-    p.text('▲', dpadX, dpadY - 22);
-    p.text('▼', dpadX, dpadY + 26);
-    p.text('◄', dpadX - 28, dpadY + 4);
-    p.text('►', dpadX + 28, dpadY + 4);
-    p.textSize(8);
-    p.fill(255, 255, 255, alpha * 0.6);
-    p.text('SPD+/−', dpadX, dpadY + 45);
-    p.text('TURN', dpadX, dpadY - 45);
-
-    // Action buttons (bottom right)
-    let btns = [
-      { label: 'PING', x: w - 180, y: h - 90, key: ' ' },
-      { label: 'FIRE', x: w - 100, y: h - 90, key: 'f' },
-      { label: 'DECOY', x: w - 60, y: h - 50, key: 't' },
-      { label: '▼', x: w - 100, y: h - 40, key: 'e' },
-      { label: '▲', x: w - 100, y: h - 140, key: 'q' },
-    ];
-    for (let b of btns) {
-      p.fill(255, 255, 255, alpha * 0.25);
-      p.stroke(255, 255, 255, alpha * 0.5);
-      p.strokeWeight(1);
-      p.ellipse(b.x, b.y, 32);
-      p.noStroke();
-      p.fill(255, 255, 255, alpha);
-      p.textSize(8);
-      p.text(b.label, b.x, b.y + 3);
-    }
-  }
-
-  p.draw = function() {
-    // Simulation
-    if (gamePhase === 'playing') {
-      simulate(p.deltaTime / 1000);
-    }
-
-    // Rendering
-    p.background(COL.bg);
-
-    if (gamePhase === 'playing') {
-      drawTacticalMap();
-      drawSonarWaterfall();
-      drawContactPanel();
-      drawStatusPanel();
-      drawProbabilityBar();
-      drawCrewCallouts();
-      drawDepthIndicator();
-    }
-
-    drawOverlay();
-    if (gamePhase === 'playing') drawMobileControls();
-
-    // Handle input
-    handleInput();
-  };
-
-  // ── INPUT ──────────────────────────────────────────────────
-
-  function handleInput() {
-    if (gamePhase !== 'playing') return;
-    let psub = state.player;
-    if (!psub) return;
-
-    // Speed
-    if (keys[87]) psub.targetSpeed = Math.min(CFG.MAX_SPEED, psub.targetSpeed + 0.5); // W
-    if (keys[83]) psub.targetSpeed = Math.max(0, psub.targetSpeed - 0.5); // S
-
-    // Turn
-    if (keys[65]) psub.heading -= 0.03; // A
-    if (keys[68]) psub.heading += 0.03; // D
-
-    // Depth
-    if (keys[81]) psub.depth = Math.max(10, psub.depth - 2); // Q
-    if (keys[69]) psub.depth = Math.min(psub.maxDepth, psub.depth + 2); // E
-
-    // Zoom
-    if (keys[77]) { targetZoom = targetZoom === 1.0 ? 2.5 : 1.0; keys[77] = false; } // M
-    zoom += (targetZoom - zoom) * 0.1;
-  }
-
-  p.keyPressed = function() {
-    keys[p.keyCode] = true;
-
-    if (gamePhase === 'playing') {
-      let psub = state.player;
-
-      // Active ping
-      if (p.key === ' ') {
-        activePingTimer = CFG.ACTIVE_PING_REVEAL_TIME;
-        activePingPos = { x: psub.x, y: psub.y };
-        addCallout('ACTIVE PING — POSITION REVEALED!', 'danger');
-        // Instantly classify all contacts better
-        for (let c of contacts) {
-          c.strength = Math.min(1, c.strength + 0.3);
-          c.uncertaintyRadius = Math.max(20, c.uncertaintyRadius * 0.3);
-        }
-        // Generate new contacts from all enemies
-        for (let e of enemies) {
-          if (e.hull <= 0) continue;
-          let c = new Contact(e.x, e.y, e.depth, 'active', 0.9, psub);
-          c.realTarget = e;
-          c.uncertaintyRadius = 40;
-          contacts.push(c);
-        }
-      }
-
-      // Fire torpedo
-      if (p.key === 'f' || p.key === 'F') {
-        if (selectedContact && selectedContact.realTarget) {
-          let torp = psub.fireTorpedo(psub.selectedTube, selectedContact.realTarget);
-          if (torp) {
-            torpedoes.push(torp);
-            let prob = Math.round(computeHitProbability(psub, selectedContact.realTarget, torp.type) * 100);
-            addCallout(`Torpedo away! Hit probability: ${prob}%`, 'text');
-          } else {
-            addCallout('Cannot fire — tube not ready or jammed.', 'warning');
-          }
-        } else {
-          addCallout('No target selected. Cycle contacts with TAB.', 'warning');
-        }
-      }
-
-      // Deploy decoy
-      if (p.key === 't' || p.key === 'T') {
-        let d = psub.deployDecoy();
-        if (d) {
-          decoys.push(d);
-          addCallout('Decoy deployed.', 'text');
-        } else {
-          addCallout('No decoys available or rack crushed.', 'warning');
-        }
-      }
-
-      // Cycle contacts
-      if (p.keyCode === 9) { // TAB
-        p.keyCode = 0; // prevent default
-        if (contacts.length > 0) {
-          let idx = contacts.indexOf(selectedContact);
-          idx = (idx + 1) % contacts.length;
-          selectedContact = contacts[idx];
-        }
-      }
-
-      // Select tube
-      if (p.key === '1') psub.selectedTube = 0;
-      if (p.key === '2') psub.selectedTube = 1;
-      if (p.key === '3') psub.selectedTube = 2;
-    }
-
-    // Enter for briefing/debriefing/gameover
-    if (p.keyCode === 13) { // ENTER
-      if (gamePhase === 'briefing') {
-        startMission(missionNum);
-      } else if (gamePhase === 'debriefing') {
-        if (missionNum < MISSIONS.length - 1) {
-          startMission(missionNum + 1);
-        } else {
-          // Restart
-          upgrades = [];
-          startMission(0);
-        }
-      } else if (gamePhase === 'gameover') {
-        upgrades = [];
-        startMission(missionNum);
-      }
-    }
-
-    return false;
-  };
-
-  p.keyReleased = function() {
-    keys[p.keyCode] = false;
-  };
-
-  p.windowResized = function() {
-    p.resizeCanvas(p.windowWidth, p.windowHeight);
-    // Recreate render buffers at new size, then reinit
-    if (RB.map) RB.map.remove();
-    if (RB.sonar) RB.sonar.remove();
-    if (RB.contacts) RB.contacts.remove();
-    if (RB.status) RB.status.remove();
-    if (RB.probBar) RB.probBar.remove();
-    if (RB.callouts) RB.callouts.remove();
-    if (RB.depth) RB.depth.remove();
-    initRenderBuffers();
-  };
+  return { init, resume, now, startAmbient, stopAmbient, playPing, playTorpedoLaunch, playExplosion, playCreak, playTorpedoWarning };
+})();
+
+// ── GAME STATE ───────────────────────────────────────────
+const CFG = {
+  MAP_R: 8000, MAX_SPEED: 22, THERMAL_TOP: 150, THERMAL_BOT: 280,
+  CRUSH: 650, PING_REVEAL: 45, TORPEDO_SPEED: 45, TORPEDO_RANGE: 6000,
+  DECOY_LIFE: 90, RELOAD: 25, HULL_MAX: 100,
 };
 
-new p5(sketch);
+let G = {
+  player: null, enemies: [], torpedoes: [], decoys: [], contacts: [],
+  mission: null, missionNum: 0, phase: 'briefing', time: 0,
+  pingTimer: 0, selectedContact: null, callouts: [],
+  sonarHistory: [], // array of bearing arrays for waterfall
+};
+
+function rnd(min, max) { return min + Math.random() * (max - min); }
+
+class Sub {
+  constructor(x, y, depth, hdg, isPlayer, cls) {
+    this.x = x; this.y = y; this.depth = depth; this.hdg = hdg; // radians
+    this.speed = 0; this.targetSpeed = 0; this.isPlayer = isPlayer;
+    this.cls = cls; this.hull = CFG.HULL_MAX; this.maxHull = CFG.HULL_MAX;
+    this.flooding = [false,false,false]; this.sonarDam = false;
+    this.engineDam = false; this.tubeJam = [false,false,false];
+    this.decoyRackCrushed = false; this.onFire = false; this.fireT = 0;
+    this.tubes = [{loaded:true,reload:0,type:'guided'},{loaded:true,reload:0,type:'guided'},{loaded:true,reload:0,type:'unguided'}];
+    this.decoys = isPlayer ? 4 : (cls === 'ace' ? 5 : 2);
+    this.selTube = 0;
+    // AI
+    this.aiState = 'patrol'; this.aiTimer = rnd(3,8); this.aiDecoyC = rnd(15,30);
+    this.aiPingC = rnd(20,40); this.aiCertainty = 0; this.aiLastKnown = null;
+  }
+  get inLayer() { return this.depth >= CFG.THERMAL_TOP && this.depth <= CFG.THERMAL_BOT; }
+  get noise() {
+    if (this.speed < 2) return 0.02;
+    if (this.speed < 6) return 0.08;
+    if (this.speed < 14) return 0.25;
+    if (this.speed < 20) return 0.55;
+    return 0.9;
+  }
+  get detectability() {
+    let d = this.noise;
+    if (this.depth > CFG.THERMAL_BOT) d *= 1 + (this.depth - CFG.THERMAL_BOT) / 400;
+    if (this.engineDam) d *= 2.5;
+    if (this.inLayer) d *= 0.35;
+    return Math.min(d, 1);
+  }
+  get crushRisk() {
+    if (this.depth < CFG.CRUSH) return 0;
+    return Math.min((this.depth - CFG.CRUSH) / 150, 1);
+  }
+  headTo(target) { return Math.atan2(target.y - this.y, target.x - this.x); }
+  distTo(target) { return Math.hypot(target.x - this.x, target.y - this.y); }
+  bearingTo(target) { let b = (this.headTo(target) - this.hdg) * 180 / Math.PI; while (b > 180) b -= 360; while (b < -180) b += 360; return b; }
+
+  update(dt) {
+    if (this.speed < this.targetSpeed) this.speed = Math.min(this.targetSpeed, this.speed + 3 * dt);
+    else this.speed = Math.max(this.targetSpeed, this.speed - 3 * dt);
+    this.speed = Math.max(0, Math.min(this.speed, CFG.MAX_SPEED));
+    this.x += Math.cos(this.hdg) * this.speed * dt * 0.5;
+    this.y += Math.sin(this.hdg) * this.speed * dt * 0.5;
+    this.x = Math.max(-CFG.MAP_R, Math.min(CFG.MAP_R, this.x));
+    this.y = Math.max(-CFG.MAP_R, Math.min(CFG.MAP_R, this.y));
+    this.depth = Math.max(10, Math.min(CFG.CRUSH + 150, this.depth));
+    if (this.crushRisk > 0 && Math.random() < this.crushRisk * dt * 0.5) this.damage(5, 'crush');
+    if (this.onFire) { this.fireT -= dt; if (Math.random() < 0.1 * dt) this.damage(3, 'fire'); if (this.fireT <= 0) this.onFire = false; }
+    let fcnt = this.flooding.filter(f => f).length;
+    if (fcnt > 0 && Math.random() < fcnt * 0.03 * dt) this.damage(2, 'flooding');
+    for (let t of this.tubes) { if (!t.loaded && !this.tubeJam[this.tubes.indexOf(t)]) { t.reload -= dt; if (t.reload <= 0) { t.loaded = true; t.reload = 0; } } }
+  }
+
+  damage(amt, src) {
+    this.hull -= amt;
+    if (Math.random() < 0.3) { let c = Math.floor(Math.random() * 3); if (!this.flooding[c]) this.flooding[c] = true; }
+    if (Math.random() < 0.2 && !this.sonarDam) this.sonarDam = true;
+    if (Math.random() < 0.15 && !this.engineDam) this.engineDam = true;
+    if (Math.random() < 0.25 && !this.onFire) { this.onFire = true; this.fireT = 30; }
+    if (Math.random() < 0.1) this.tubeJam[Math.floor(Math.random() * 3)] = true;
+    if (Math.random() < 0.1 && !this.decoyRackCrushed) this.decoyRackCrushed = true;
+    if (this.isPlayer) {
+      callout(`Hull breach! ${Math.round(amt)} damage from ${src}. Hull: ${Math.round(this.hull)}%`, 'danger');
+      if (this.flooding.some(f => f)) callout('Flooding detected!', 'warn');
+      if (this.sonarDam) callout('Sonar array impaired — reduced classification accuracy.', 'warn');
+      if (this.engineDam) callout('Engine damage — noise signature increased 2.5×', 'warn');
+    }
+  }
+
+  fireTube(idx, target) {
+    if (!this.tubes[idx] || !this.tubes[idx].loaded || this.tubeJam[idx]) return null;
+    this.tubes[idx].loaded = false; this.tubes[idx].reload = CFG.RELOAD;
+    return { x: this.x, y: this.y, depth: this.depth, hdg: this.hdg, type: this.tubes[idx].type, owner: this, target, alive: true, traveled: 0, wire: this.tubes[idx].type === 'guided', age: 0 };
+  }
+  deployDecoy() {
+    if (this.decoys <= 0 || this.decoyRackCrushed) return null;
+    this.decoys--;
+    return { x: this.x, y: this.y, depth: this.depth, hdg: this.hdg, owner: this, alive: true, age: 0, life: CFG.DECOY_LIFE, speed: 2 + Math.random() * 3, fakePlayer: false };
+  }
+
+  updateAI(dt, player) {
+    this.aiTimer -= dt; this.aiDecoyC -= dt; this.aiPingC -= dt;
+    let dist = this.distTo(player);
+    let canDetect = dist < 3000 && this.cls !== 'ace' ? player.detectability > 0.1 : player.detectability > 0.05;
+    if (canDetect) { this.aiCertainty = Math.min(1, this.aiCertainty + dt * 0.3); this.aiLastKnown = { x: player.x, y: player.y, depth: player.depth, t: G.time }; }
+    else this.aiCertainty = Math.max(0, this.aiCertainty - dt * 0.1);
+
+    switch (this.aiState) {
+      case 'patrol':
+        this.targetSpeed = 3 + Math.random() * 3;
+        this.hdg += rnd(-0.02, 0.02);
+        if (canDetect && dist < 2500) { this.aiState = 'stalk'; this.aiTimer = rnd(4, 10); }
+        break;
+      case 'stalk':
+        this.targetSpeed = this.cls === 'stealth' ? 1.5 : 2.5;
+        let a = this.headTo(player);
+        let ad = a - this.hdg; while (ad > Math.PI) ad -= 2*Math.PI; while (ad < -Math.PI) ad += 2*Math.PI;
+        this.hdg += ad * 0.02;
+        if (this.depth < player.depth - 30) this.depth += 5 * dt;
+        else if (this.depth > player.depth + 30) this.depth -= 5 * dt;
+        if (this.aiTimer <= 0 && dist < 1800 && this.aiCertainty > 0.5) { this.aiState = 'attack'; this.aiTimer = rnd(2, 5); }
+        if (!canDetect && this.aiTimer <= 0) this.aiState = 'patrol';
+        break;
+      case 'attack':
+        this.targetSpeed = 6;
+        let a2 = this.headTo(player), ad2 = a2 - this.hdg;
+        while (ad2 > Math.PI) ad2 -= 2*Math.PI; while (ad2 < -Math.PI) ad2 += 2*Math.PI;
+        this.hdg += ad2 * 0.05;
+        if (Math.abs(ad2) < 0.25 && dist < 2000 && this.aiTimer <= 0) {
+          let ti = this.tubes.findIndex(t => t.loaded && !this.tubeJam[this.tubes.indexOf(t)]);
+          if (ti >= 0) {
+            this.tubes[ti].loaded = false; this.tubes[ti].reload = CFG.RELOAD;
+            G.torpedoes.push({ x: this.x, y: this.y, depth: this.depth, hdg: a2, type: 'guided', owner: this, target: player, alive: true, traveled: 0, wire: true, age: 0 });
+            callout('TORPEDO IN THE WATER! Incoming from bearing ' + Math.round(player.bearingTo(this)) + '°!', 'danger');
+            Audio.playTorpedoWarning();
+          }
+          this.aiState = 'evade'; this.aiTimer = rnd(10, 20);
+        }
+        break;
+      case 'evade':
+        this.targetSpeed = this.cls === 'stealth' ? 2 : 12;
+        this.hdg += rnd(-0.06, 0.06);
+        if (this.depth < CFG.THERMAL_BOT - 30) this.depth += 20 * dt; else this.depth -= 20 * dt;
+        if (this.aiTimer < 8 && this.aiDecoyC <= 0 && this.decoys > 0) {
+          let d = this.deployDecoy();
+          if (d) G.decoys.push(d);
+          this.aiDecoyC = rnd(20, 35);
+        }
+        if (this.aiTimer <= 0) this.aiState = canDetect ? 'stalk' : 'patrol';
+        break;
+    }
+    // Ace behaviors
+    if (this.cls === 'ace') {
+      if (G.time > 20 && this.decoys > 0 && this.aiDecoyC <= 0 && Math.random() < 0.006) {
+        let d = this.deployDecoy();
+        if (d) { d.fakePlayer = true; G.decoys.push(d); this.aiDecoyC = 40; callout('New ambiguous contact detected.', 'warn'); }
+      }
+      if (this.aiState === 'stalk' && this.aiCertainty < 0.4 && this.aiPingC <= 0) {
+        this.aiPingC = 60;
+        if (player) { this.aiLastKnown = { x: player.x, y: player.y, depth: player.depth, t: G.time }; this.aiCertainty = 0.9; }
+        callout('ACTIVE PING DETECTED — Enemy has acquired our position!', 'danger');
+      }
+    }
+  }
+}
+
+let torpedoUpdate = (t, dt) => {
+  t.age += dt; t.traveled += CFG.TORPEDO_SPEED * dt * 0.5;
+  if (t.traveled > CFG.TORPEDO_RANGE) { t.alive = false; return; }
+  let target = t.target;
+  if (!target || target.hull <= 0) { t.alive = false; return; }
+  let ta = Math.atan2(target.y - t.y, target.x - t.x);
+  let td = ta - t.hdg; while (td > Math.PI) td -= 2*Math.PI; while (td < -Math.PI) td += 2*Math.PI;
+  let turnRate = t.type === 'guided' && t.wire ? 0.04 : 0.015;
+  t.hdg += td * Math.min(turnRate, 0.02 * dt * 10);
+  if (t.type === 'guided' && t.wire && Math.random() < 0.003 * dt * 10) { t.wire = false; if (t.owner.isPlayer) callout('Wire broken — torpedo running autonomous.', 'warn'); }
+  t.x += Math.cos(t.hdg) * CFG.TORPEDO_SPEED * dt * 0.5;
+  t.y += Math.sin(t.hdg) * CFG.TORPEDO_SPEED * dt * 0.5;
+  // Decoy check
+  for (let d of G.decoys) {
+    if (!d.alive) continue;
+    if (Math.hypot(t.x - d.x, t.y - d.y) < 150 && Math.random() < 0.65) { t.target = d; break; }
+  }
+  let dist = Math.hypot(t.x - target.x, t.y - target.y);
+  let dd = Math.abs(t.depth - target.depth);
+  if (dist < 80 && dd < 60) {
+    t.alive = false;
+    target.damage(t.type === 'unguided' ? 35 : 25, 'torpedo');
+    Audio.playExplosion(target.isPlayer ? 0.5 : Math.max(0.5, G.player.distTo(target) / 4000));
+    if (target.isPlayer) callout('DIRECT HIT — We\'ve been struck!', 'danger');
+    else if (t.owner.isPlayer) callout('HIT! Target destroyed.', 'success');
+  }
+};
+
+function callout(msg, type = 'info') {
+  G.callouts.push({ msg, type, life: 6 });
+  if (G.callouts.length > 7) G.callouts.shift();
+}
+
+// ── PROBABILITY COMPUTATION ──────────────────────────────
+function detectProb(detector, target) {
+  if (!detector || !target) return 0;
+  let dist = Math.hypot(detector.x - target.x, detector.y - target.y);
+  if (dist > 4000) return 0;
+  let base = target.detectability * (1 - dist / 4000);
+  let sf = detector.isPlayer ? 1.0 : (detector.cls === 'stealth' ? 1.3 : 0.9);
+  let df = Math.abs(detector.depth - target.depth) > 150 ? 0.6 : 1;
+  if (detector.inLayer !== target.inLayer) df *= 0.3;
+  if (detector.sonarDam) sf *= 0.5;
+  return Math.min(base * sf * df, 0.99);
+}
+function hitProb(shooter, target, torpType) {
+  let dist = Math.hypot(shooter.x - target.x, shooter.y - target.y);
+  if (dist > CFG.TORPEDO_RANGE) return 0;
+  let base = 0.7 * (1 - dist / CFG.TORPEDO_RANGE * 0.5);
+  base *= 1 - target.speed / CFG.MAX_SPEED * 0.4;
+  if (target.aiState === 'evade') base *= 0.6;
+  if (shooter.inLayer !== target.inLayer) base *= 0.7;
+  if (torpType === 'guided') base *= 1.1;
+  if (torpType === 'unguided') base *= 0.85;
+  if (G.decoys.some(d => d.alive && d.owner === target)) base *= 0.7;
+  return Math.max(0.05, Math.min(base, 0.95));
+}
+
+// ── CONTACTS ─────────────────────────────────────────────
+function updateContacts() {
+  let p = G.player;
+  G.contacts = G.contacts.filter(c => c.age < 40);
+  // Remove dead targets
+  G.contacts = G.contacts.filter(c => {
+    if (!c.src) return true;
+    if (c.src.hull !== undefined && c.src.hull <= 0) return false;
+    if (c.src.alive === false) return false;
+    return true;
+  });
+  // Generate from enemies
+  for (let e of G.enemies) {
+    if (e.hull <= 0) continue;
+    let dp = detectProb(p, e);
+    if (dp > 0.12) {
+      let nx = e.x + rnd(-1, 1) * (1 - dp) * 500;
+      let ny = e.y + rnd(-1, 1) * (1 - dp) * 500;
+      let ex = G.contacts.find(c => c.src === e);
+      if (ex) {
+        ex.x = nx; ex.y = ny; ex.depth = e.depth; ex.strength = dp; ex.age = 0;
+      } else {
+        G.contacts.push({ id: 'C' + (G.contacts.length + 1), x: nx, y: ny, depth: e.depth, strength: dp, src: e, age: 0, isDecoy: false, class: classify(dp) });
+      }
+    }
+  }
+  // Generate from decoys
+  for (let d of G.decoys) {
+    if (!d.alive) continue;
+    let ex = G.contacts.find(c => c.src === d);
+    if (ex) { ex.x = d.x + rnd(-200, 200); ex.y = d.y + rnd(-200, 200); ex.strength = 0.5; ex.age = 0; }
+    else G.contacts.push({ id: 'C' + (G.contacts.length + 1), x: d.x + rnd(-200, 200), y: d.y + rnd(-200, 200), depth: d.depth, strength: 0.5, src: d, age: 0, isDecoy: true, class: { hostile: d.fakePlayer ? 0.4 : 0.1, decoy: 0.55, wreck: 0.1, bio: 0.15, anom: 0.1 } });
+  }
+  // False contacts if sonar damaged
+  if (p.sonarDam && Math.random() < 0.3) {
+    G.contacts.push({ id: 'C' + (G.contacts.length + 1), x: p.x + rnd(-2500, 2500), y: p.y + rnd(-2500, 2500), depth: p.depth + rnd(-100, 100), strength: 0.08, src: null, age: 0, isDecoy: false, class: { hostile: 0.08, decoy: 0.05, wreck: 0.5, bio: 0.2, anom: 0.17 } });
+  }
+  for (let c of G.contacts) c.age += 2;
+  // Sonar waterfall data
+  G.sonarHistory.push(G.contacts.map(c => {
+    let brg = ((G.player.bearingTo({ x: c.x, y: c.y }) + 360) % 360);
+    return { brg, str: c.strength };
+  }));
+  if (G.sonarHistory.length > 200) G.sonarHistory.shift();
+}
+
+function classify(strength) {
+  let s = strength;
+  let raw = { hostile: s * 0.55, wreck: (1 - s) * 0.35, decoy: 0.06, bio: 0.1, anom: 0.04 };
+  let sum = Object.values(raw).reduce((a, b) => a + b, 0);
+  for (let k in raw) raw[k] = Math.round(raw[k] / sum * 100);
+  return raw;
+}
+
+// ── MISSIONS ─────────────────────────────────────────────
+const MISSIONS = [
+  { name: 'Operation: Wreck Diver', brief: 'Hostile Akula-class hunter-killer patrolling Wreck Alley. Intel suggests an aggressive captain. Eliminate the target and return to base. Thermal layer at 150–280m. Use terrain for cover.', enemies: ['hunter'], obj: 'Eliminate the hostile submarine.' },
+  { name: 'Operation: Shadow Protocol', brief: 'Two contacts in sector: a Yasen-class stealth predator and a Typhoon-class armored leviathan. The stealth sub is the priority — it will stalk you. The leviathan is slow but heavily armored. Divide and conquer.', enemies: ['stealth', 'leviathan'], obj: 'Eliminate all hostile submarines.' },
+  { name: 'Operation: Ghost Hunt', brief: 'K-561 "Ghost" — Captain Morozov, callsign "Echo." He knows our tactics. He adapts. He deploys decoys that sound like our boats. This is a trap, and we are springing it. Stay alert. Trust nothing.', enemies: ['ace', 'hunter'], obj: 'Eliminate Captain Morozov.' },
+];
+
+function startMission(n) {
+  G.missionNum = n; G.mission = MISSIONS[n];
+  G.time = 0; G.enemies = []; G.torpedoes = []; G.decoys = [];
+  G.contacts = []; G.callouts = []; G.pingTimer = 0;
+  G.selectedContact = null; G.sonarHistory = [];
+  G.player = new Sub(0, 0, 200, -Math.PI / 4, true, 'player');
+  G.player.targetSpeed = 3;
+  // Spawn enemies
+  let types = G.mission.enemies;
+  for (let cls of types) {
+    let angle = rnd(0, Math.PI * 2), dist = rnd(1200, 2800);
+    let e = new Sub(Math.cos(angle) * dist, Math.sin(angle) * dist, rnd(100, 350), rnd(0, Math.PI * 2), false, cls);
+    e.targetSpeed = 3 + Math.random() * 3;
+    G.enemies.push(e);
+  }
+  G.phase = 'playing';
+  Audio.init(); Audio.resume();
+  Audio.startAmbient(G.player.depth);
+  callout('All systems nominal. Running silent.', 'info');
+  callout(`Mission: ${G.mission.name}`, 'info');
+  callout('Passive sonar online. No contacts detected.', 'info');
+  document.getElementById('overlay').classList.remove('show');
+  document.getElementById('cmd-input').focus();
+}
+
+// ── COMMAND PARSER ───────────────────────────────────────
+function execCommand(cmd) {
+  cmd = cmd.trim().toLowerCase();
+  if (!cmd) return;
+  let p = G.player; if (!p || G.phase !== 'playing') return;
+  let parts = cmd.split(/\s+/);
+  let op = parts[0], arg = parts[1];
+
+  if (op === 'spd' || op === 'speed') {
+    let v = parseFloat(arg);
+    if (arg && (arg.startsWith('+') || arg.startsWith('-'))) p.targetSpeed = Math.max(0, Math.min(CFG.MAX_SPEED, p.targetSpeed + v));
+    else if (!isNaN(v)) p.targetSpeed = Math.max(0, Math.min(CFG.MAX_SPEED, v));
+    callout(`Speed set to ${Math.round(p.targetSpeed)} kts.`, 'info');
+  } else if (op === 'dep' || op === 'depth') {
+    let v = parseFloat(arg);
+    if (arg && (arg.startsWith('+') || arg.startsWith('-'))) p.depth = Math.max(10, Math.min(CFG.CRUSH + 150, p.depth + v));
+    else if (!isNaN(v)) p.depth = Math.max(10, Math.min(CFG.CRUSH + 150, v));
+    callout(`Depth set to ${Math.round(p.depth)}m.`, 'info');
+  } else if (op === 'turn' || op === 'hdg') {
+    if (arg === 'port' || arg === 'left') p.hdg -= Math.PI / 6;
+    else if (arg === 'starboard' || arg === 'right') p.hdg += Math.PI / 6;
+    else { let v = parseFloat(arg); if (!isNaN(v)) p.hdg = v * Math.PI / 180; }
+    callout(`Heading ${Math.round(((p.hdg * 180 / Math.PI) % 360 + 360) % 360)}°.`, 'info');
+  } else if (op === 'ping') {
+    G.pingTimer = CFG.PING_REVEAL;
+    Audio.playPing();
+    callout('ACTIVE PING — ALL enemies within 8km now have our position!', 'danger');
+    for (let e of G.enemies) {
+      if (e.hull <= 0) continue;
+      let c = G.contacts.find(c => c.src === e);
+      if (!c) G.contacts.push({ id: 'C' + (G.contacts.length + 1), x: e.x, y: e.y, depth: e.depth, strength: 0.9, src: e, age: 0, isDecoy: false, class: { hostile: 85, wreck: 5, decoy: 5, bio: 3, anom: 2 } });
+      else { c.strength = 0.9; c.x = e.x; c.y = e.y; }
+    }
+  } else if (op === 'fire' || op === 'shoot') {
+    let cid = arg ? arg.toUpperCase() : (G.selectedContact ? G.selectedContact.id : null);
+    let ct = G.contacts.find(c => c.id === cid);
+    if (!ct || !ct.src || ct.src.hull <= 0) { callout('No valid target. Select with "fire C1".', 'warn'); return; }
+    let torp = p.fireTube(p.selTube, ct.src);
+    if (torp) {
+      G.torpedoes.push(torp);
+      Audio.playTorpedoLaunch();
+      let prob = Math.round(hitProb(p, ct.src, torp.type) * 100);
+      callout(`Torpedo away! Hit probability: ${prob}%.`, 'info');
+    } else callout('Cannot fire — tube not ready or jammed.', 'warn');
+  } else if (op === 'decoy' || op === 'd') {
+    let d = p.deployDecoy();
+    if (d) { G.decoys.push(d); callout('Decoy deployed.', 'info'); }
+    else callout('No decoys available or rack crushed.', 'warn');
+  } else if (op === 'silent' || op === 'quiet') {
+    p.targetSpeed = 0; callout('Running silent. All systems minimal.', 'info');
+  } else if (op === 'flank') {
+    p.targetSpeed = CFG.MAX_SPEED; callout('Flank speed! Noise signature extreme!', 'warn');
+  } else if (op === 'tube' || op === 't') {
+    let v = parseInt(arg);
+    if (v >= 1 && v <= 3) { p.selTube = v - 1; callout(`Tube ${v} selected.`, 'info'); }
+    else callout('Tube must be 1, 2, or 3.', 'warn');
+  } else if (op === 'scan' || op === 's') {
+    if (G.contacts.length === 0) { callout('No contacts to scan.', 'info'); return; }
+    for (let c of G.contacts) {
+      let brg = Math.round(((G.player.bearingTo({ x: c.x, y: c.y }) + 360) % 360));
+      let rng = Math.round(Math.hypot(c.x - p.x, c.y - p.y));
+      let cls = c.class;
+      let dom = Object.entries(cls).sort((a, b) => b[1] - a[1])[0];
+      callout(`${c.id}: BRG ${brg}° RNG ~${rng}m | ${dom[1]}% ${dom[0]}`, 'info');
+    }
+  } else if (op === 'status' || op === 'stat') {
+    callout(`SPD:${Math.round(p.speed)}kts DEP:${Math.round(p.depth)}m HDG:${Math.round(((p.hdg * 180 / Math.PI) % 360 + 360) % 360)}° HULL:${Math.round(p.hull)}% SIG:${Math.round(p.detectability * 100)}%`, 'info');
+    for (let i = 0; i < 3; i++) callout(`Tube ${i+1}: ${p.tubeJam[i] ? 'JAMMED' : p.tubes[i].loaded ? 'READY' : 'RELOAD '+Math.round(p.tubes[i].reload)+'s'}`, 'info');
+  } else if (op === 'help' || op === '?') {
+    callout('Commands: spd/dep/turn ±N | ping | fire C1 | decoy | silent/flank | tube 1-3 | scan | status | help', 'info');
+  } else if (op === 'c1' || op === 'c2' || op === 'c3' || op === 'c4' || op === 'c5' || op === 'c6') {
+    let ct = G.contacts.find(c => c.id === op.toUpperCase());
+    if (ct) { G.selectedContact = ct; callout(`Tracking ${ct.id}.`, 'info'); }
+    else callout('Contact not found.', 'warn');
+  } else {
+    callout('Unknown command. Type "help" for available commands.', 'warn');
+  }
+}
+
+// ── UI RENDERING ─────────────────────────────────────────
+function renderUI() {
+  let p = G.player; if (!p) return;
+  // Sysbar
+  document.getElementById('v-speed').textContent = Math.round(p.speed);
+  document.getElementById('v-depth').textContent = Math.round(p.depth);
+  document.getElementById('v-heading').textContent = Math.round(((p.hdg * 180 / Math.PI) % 360 + 360) % 360);
+  document.getElementById('v-hull').textContent = Math.round(p.hull);
+  let sig = p.detectability;
+  let sigEl = document.getElementById('v-sig');
+  sigEl.textContent = sig < 0.15 ? 'LOW' : sig < 0.4 ? 'MED' : 'HIGH';
+  sigEl.className = sig < 0.15 ? 'val' : sig < 0.4 ? 'val' : 'val warn';
+
+  // Contacts
+  let cl = document.getElementById('contact-list');
+  cl.innerHTML = G.contacts.map(c => {
+    let brg = Math.round(((p.bearingTo({ x: c.x, y: c.y }) + 360) % 360));
+    let rng = Math.round(Math.hypot(c.x - p.x, c.y - p.y));
+    let cls = c.class;
+    let dom = Object.entries(cls).sort((a, b) => b[1] - a[1])[0];
+    let pct = dom[1];
+    let active = G.selectedContact === c ? ' active' : '';
+    return `<div class="contact-row${active}" onclick="selectContact('${c.id}')">
+      <span class="id">${c.id}</span><span class="brg">${brg}°</span>
+      <span class="cls" style="color:${pct > 60 ? 'var(--red)' : pct > 35 ? 'var(--amber)' : 'var(--dim)'}">${pct}% ${dom[0]}</span>
+      <span class="rng">~${rng}m</span>
+    </div>`;
+  }).join('') || '<span style="color:var(--dim)">No contacts detected.</span>';
+
+  // Probabilities
+  let pd = document.getElementById('prob-dash');
+  if (G.selectedContact && G.selectedContact.src && G.selectedContact.src.hull > 0) {
+    let tgt = G.selectedContact.src;
+    let hp = Math.round(hitProb(p, tgt, p.tubes[p.selTube].type) * 100);
+    let dp = Math.round(detectProb(p, tgt) * 100);
+    let ed = Math.round(detectProb(tgt, p) * 100);
+    let fs = ed > 50 ? 'LIKELY' : ed > 30 ? 'POSSIBLE' : 'UNLIKELY';
+    let tw = G.torpedoes.some(t => !t.owner.isPlayer && t.alive);
+    pd.innerHTML = `
+      <div class="stat-row"><span class="l">HIT CHANCE</span><span class="v" style="color:${hp>60?'var(--green)':hp>35?'var(--amber)':'var(--red)'}">${hp}%</span></div>
+      <div class="stat-row"><span class="l">DETECTION</span><span class="v">${dp}%</span></div>
+      <div class="stat-row"><span class="l">ENEMY AWARE</span><span class="v" style="color:${ed>50?'var(--red)':ed>30?'var(--amber)':'var(--green)'}">${ed}%</span></div>
+      <div class="stat-row"><span class="l">FIRING SOL.</span><span class="v" style="color:${fs==='LIKELY'?'var(--red)':'var(--dim)'}">${fs}</span></div>
+      ${tw ? '<div style="color:var(--red);margin-top:4px;animation:blink 0.6s infinite">⚠ TORPEDO IN WATER</div>' : ''}
+    `;
+  } else pd.innerHTML = '<span style="color:var(--dim)">Select a contact (C1, C2...)</span>';
+
+  // Weapons
+  document.getElementById('weapons').innerHTML = p.tubes.map((t, i) => {
+    let status = p.tubeJam[i] ? 'JAMMED' : t.loaded ? 'READY' : `RELOAD ${Math.round(t.reload)}s`;
+    let clr = p.tubeJam[i] ? 'var(--red)' : t.loaded ? 'var(--green)' : 'var(--amber)';
+    return `<div class="stat-row"><span class="l">T${i+1} [${t.type}]</span><span class="v" style="color:${clr}">${status}${i === p.selTube ? ' ◀' : ''}</span></div>`;
+  }).join('') + `<div class="stat-row"><span class="l">DECOYS</span><span class="v">${p.decoys}${p.decoyRackCrushed ? ' CRUSHED' : ''}</span></div>`;
+
+  // Damage
+  document.getElementById('damage').innerHTML = `
+    <div class="stat-row"><span class="l">HULL</span><span class="v">${Math.round(p.hull)}%</span></div>
+    <div class="gauge"><div class="fill ${p.hull>50?'fill-green':p.hull>25?'fill-amber':'fill-red'}" style="width:${p.hull}%"></div></div>
+    ${p.flooding.some(f=>f) ? `<div class="stat-row"><span class="l">FLOODING</span><span class="v" style="color:var(--red)">COMPT ${p.flooding.map((f,i)=>f?'C'+(i+1):'').filter(Boolean).join(', ')}</span></div>` : ''}
+    ${p.sonarDam ? '<div class="stat-row"><span class="l">SONAR</span><span class="v" style="color:var(--amber)">IMPAIRED</span></div>' : ''}
+    ${p.engineDam ? '<div class="stat-row"><span class="l">ENGINE</span><span class="v" style="color:var(--amber)">DAMAGED +NOISE</span></div>' : ''}
+    ${p.onFire ? '<div class="stat-row"><span class="l">FIRE</span><span class="v" style="color:var(--red);animation:blink 0.5s infinite">ACTIVE '+Math.round(p.fireT)+'s</span></div>' : ''}
+  `;
+
+  // Callouts
+  document.getElementById('callouts').innerHTML = G.callouts.slice(-5).map(c =>
+    `<div class="callout ${c.type}">${c.msg}</div>`
+  ).join('');
+
+  // Ping indicator in sysbar
+  if (G.pingTimer > 0) {
+    document.getElementById('v-sig').textContent = 'PINGED';
+    document.getElementById('v-sig').className = 'val warn';
+  }
+}
+
+// ── SONAR WATERFALL CANVAS ───────────────────────────────
+let waterfallCanvas, waterfallCtx;
+function initWaterfall() {
+  waterfallCanvas = document.getElementById('sonar');
+  waterfallCtx = waterfallCanvas.getContext('2d');
+  resizeWaterfall();
+}
+
+function resizeWaterfall() {
+  let panel = document.getElementById('sonar-panel');
+  waterfallCanvas.width = panel.clientWidth;
+  waterfallCanvas.height = panel.clientHeight;
+}
+
+function drawWaterfall() {
+  if (!waterfallCtx) return;
+  let w = waterfallCanvas.width, h = waterfallCanvas.height;
+  waterfallCtx.fillStyle = '#0a0d12';
+  waterfallCtx.fillRect(0, 0, w, h);
+
+  // Grid lines
+  waterfallCtx.strokeStyle = 'rgba(26,36,48,0.4)';
+  waterfallCtx.lineWidth = 0.5;
+  for (let i = 0; i < 12; i++) {
+    let x = w * i / 12;
+    waterfallCtx.beginPath(); waterfallCtx.moveTo(x, 0); waterfallCtx.lineTo(x, h); waterfallCtx.stroke();
+  }
+  // Bearing labels
+  waterfallCtx.fillStyle = '#5a6a7a';
+  waterfallCtx.font = '9px monospace';
+  waterfallCtx.textAlign = 'center';
+  for (let i = 0; i < 12; i++) {
+    waterfallCtx.fillText(i * 30 + '°', w * i / 12 + w / 24, h - 6);
+  }
+
+  // Waterfall data
+  let maxRows = Math.min(G.sonarHistory.length, Math.floor(h / 2));
+  for (let row = 0; row < maxRows; row++) {
+    let y = h - 20 - row * 2;
+    let data = G.sonarHistory[G.sonarHistory.length - 1 - row];
+    if (!data) continue;
+    for (let entry of data) {
+      let x = (entry.brg / 360) * w;
+      let alpha = entry.str * 0.8;
+      let r = 0, g = 0, b = 0;
+      if (entry.str > 0.6) { r = 255; g = 80; b = 80; }
+      else if (entry.str > 0.3) { r = 255; g = 180; b = 30; }
+      else { r = 0; g = 200; b = 100; }
+      waterfallCtx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      waterfallCtx.fillRect(x, y, Math.max(1, w / 360), 2);
+    }
+  }
+
+  // Player bearing indicator
+  waterfallCtx.strokeStyle = 'rgba(0,229,255,0.3)';
+  waterfallCtx.lineWidth = 1;
+  waterfallCtx.beginPath();
+  waterfallCtx.moveTo(w / 2, 0);
+  waterfallCtx.lineTo(w / 2, h);
+  waterfallCtx.stroke();
+
+  // Active ping flash
+  if (G.pingTimer > CFG.PING_REVEAL - 2) {
+    waterfallCtx.fillStyle = 'rgba(0,200,255,0.15)';
+    waterfallCtx.fillRect(0, 0, w, h);
+  }
+}
+
+// ── GAME LOOP ────────────────────────────────────────────
+let lastTime = 0;
+function gameLoop(ts) {
+  if (lastTime === 0) lastTime = ts;
+  let dt = Math.min((ts - lastTime) / 1000, 0.1);
+  lastTime = ts;
+
+  if (G.phase === 'playing') {
+    G.time += dt;
+    let p = G.player;
+    if (p) {
+      p.update(dt);
+      // Creaks at depth
+      if (p.depth > 300 && Math.random() < 0.002) Audio.playCreak();
+      // Ping timer
+      if (G.pingTimer > 0) G.pingTimer -= dt;
+    }
+    // Enemies
+    for (let e of G.enemies) { if (e.hull > 0) { e.update(dt); e.updateAI(dt, p); } }
+    // Torpedoes
+    for (let t of G.torpedoes) { if (t.alive) torpedoUpdate(t, dt); }
+    G.torpedoes = G.torpedoes.filter(t => t.alive);
+    // Decoys
+    for (let d of G.decoys) {
+      if (!d.alive) continue;
+      d.age += dt;
+      if (d.age > d.life) d.alive = false;
+      d.hdg += rnd(-0.03, 0.03);
+      d.x += Math.cos(d.hdg) * d.speed * dt * 0.5;
+      d.y += Math.sin(d.hdg) * d.speed * dt * 0.5;
+    }
+    G.decoys = G.decoys.filter(d => d.alive);
+    // Callout decay
+    for (let c of G.callouts) c.life -= dt;
+    G.callouts = G.callouts.filter(c => c.life > 0);
+    // Contact updates
+    if (Math.floor(G.time / 2) !== Math.floor((G.time - dt) / 2)) updateContacts();
+    // Mission complete
+    if (G.enemies.every(e => e.hull <= 0)) {
+      G.phase = 'debriefing';
+      callout('MISSION COMPLETE. All objectives achieved.', 'success');
+      showOverlay('debriefing');
+    }
+    if (p && p.hull <= 0) {
+      G.phase = 'gameover';
+      callout('HULL CRITICAL. The Kestrel is lost.', 'danger');
+      showOverlay('gameover');
+    }
+    // Render UI
+    renderUI();
+    drawWaterfall();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+// ── OVERLAY MANAGEMENT ───────────────────────────────────
+function showOverlay(type) {
+  let ov = document.getElementById('overlay');
+  ov.classList.add('show');
+  let brief = document.getElementById('mission-brief');
+  let startBtn = document.getElementById('start-btn');
+  let title = ov.querySelector('h1');
+  let sub = ov.querySelector('h2');
+
+  if (type === 'briefing') {
+    title.textContent = 'ECHO PROTOCOL';
+    sub.textContent = 'BENTHIC COLD WAR · 2047';
+    brief.textContent = G.mission ? G.mission.brief : 'Select a mission to begin.';
+    startBtn.textContent = '▶ CLICK OR PRESS ENTER TO START ◀';
+    startBtn.style.display = '';
+    ov.querySelector('.controls').style.display = '';
+    sub.style.display = '';
+  } else if (type === 'debriefing') {
+    title.style.color = 'var(--green)';
+    title.textContent = 'MISSION COMPLETE';
+    sub.style.display = 'none';
+    brief.innerHTML = G.missionNum < MISSIONS.length - 1
+      ? '<div class="result" style="color:var(--green)">Upgrade acquired</div><div class="sub">Enhanced systems available for next mission.</div>'
+      : '<div class="result" style="color:var(--green)">Campaign Complete</div><div class="sub">All missions accomplished. The deep is safe... for now.</div>';
+    startBtn.textContent = '▶ PRESS ENTER TO CONTINUE ◀';
+    startBtn.style.display = '';
+    ov.querySelector('.controls').style.display = 'none';
+  } else if (type === 'gameover') {
+    title.style.color = 'var(--red)';
+    title.textContent = 'HULL CRITICAL';
+    sub.style.display = 'none';
+    brief.innerHTML = '<div class="sub">The Kestrel is lost. The deep takes everything it\'s owed.</div>';
+    startBtn.textContent = '▶ PRESS ENTER TO RETRY ◀';
+    startBtn.style.display = '';
+    ov.querySelector('.controls').style.display = 'none';
+  }
+}
+
+// ── EVENT BINDINGS ───────────────────────────────────────
+document.getElementById('cmd-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    let inp = e.target;
+    execCommand(inp.value);
+    inp.value = '';
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && G.phase !== 'playing') {
+    Audio.init(); Audio.resume();
+    if (G.phase === 'briefing') startMission(G.missionNum);
+    else if (G.phase === 'debriefing') {
+      if (G.missionNum < MISSIONS.length - 1) startMission(G.missionNum + 1);
+      else { startMission(0); }
+    } else if (G.phase === 'gameover') startMission(G.missionNum);
+  }
+  // Shortcut keys during gameplay
+  if (G.phase === 'playing') {
+    let p = G.player;
+    if (e.key === 'w') { p.targetSpeed = Math.min(CFG.MAX_SPEED, p.targetSpeed + 2); renderUI(); }
+    if (e.key === 's') { p.targetSpeed = Math.max(0, p.targetSpeed - 2); renderUI(); }
+    if (e.key === 'a') { p.hdg -= 0.2; renderUI(); }
+    if (e.key === 'd') { p.hdg += 0.2; renderUI(); }
+    if (e.key === 'q') { p.depth = Math.max(10, p.depth - 20); renderUI(); }
+    if (e.key === 'e') { p.depth = Math.min(CFG.CRUSH + 150, p.depth + 20); renderUI(); }
+    if (e.key === ' ') { e.preventDefault(); execCommand('ping'); }
+    if (e.key === 'f') { execCommand('fire'); }
+    if (e.key === 't') { execCommand('decoy'); }
+    if (e.key === 'Tab') { e.preventDefault(); let idx = G.contacts.indexOf(G.selectedContact); G.selectedContact = G.contacts[(idx + 1) % G.contacts.length] || null; renderUI(); }
+    if (e.key === '1') { p.selTube = 0; renderUI(); }
+    if (e.key === '2') { p.selTube = 1; renderUI(); }
+    if (e.key === '3') { p.selTube = 2; renderUI(); }
+  }
+});
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  Audio.init(); Audio.resume();
+  if (G.phase === 'briefing') startMission(G.missionNum);
+  else if (G.phase === 'debriefing') {
+    if (G.missionNum < MISSIONS.length - 1) startMission(G.missionNum + 1);
+    else startMission(0);
+  } else if (G.phase === 'gameover') startMission(G.missionNum);
+});
+
+document.addEventListener('click', () => { Audio.init(); Audio.resume(); });
+document.addEventListener('touchstart', () => { Audio.init(); Audio.resume(); }, { once: true });
+
+window.addEventListener('resize', resizeWaterfall);
+
+function selectContact(id) {
+  let ct = G.contacts.find(c => c.id === id);
+  if (ct) { G.selectedContact = ct; renderUI(); document.getElementById('cmd-input').focus(); }
+}
+
+// ── INIT ────────────────────────────────────────────────
+initWaterfall();
+G.mission = MISSIONS[0];
+G.player = new Sub(0, 0, 200, -Math.PI / 4, true, 'player');
+showOverlay('briefing');
+requestAnimationFrame(gameLoop);
 </script>
 </body>
 </html>
