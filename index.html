@@ -255,7 +255,23 @@ const Audio = (() => {
       o.start(t + i * 0.15); o.stop(t + i * 0.15 + 0.13);
     }
   }
-  return { init, ping, torpedo, explosion, hit, warning };
+  function killStinger() {
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    // triumphant rising chord
+    [440, 554, 659].forEach((freq, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'triangle';
+      o.frequency.setValueAtTime(freq, t + i * 0.04);
+      g.gain.setValueAtTime(0, t + i * 0.04);
+      g.gain.linearRampToValueAtTime(0.18, t + i * 0.04 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t + i * 0.04); o.stop(t + 0.55);
+    });
+  }
+  return { init, ping, torpedo, explosion, hit, warning, killStinger };
 })();
 
 // ============================================================================
@@ -271,7 +287,7 @@ const state = {
   mouseX: 0, mouseY: 0,
   mouseDown: false,
   camX: 0, camY: 0,
-  camZoom: 0.55,     // pixels per meter (will tune)
+  camZoom: 0.95,     // pixels per meter — meaty sub feel
   player: null,
   enemies: [],
   torpedoes: [],
@@ -292,8 +308,8 @@ function makePlayer() {
     x: 0, y: 0,
     heading: 0,
     targetHeading: 0,
-    speed: 6,         // current speed (kt)
-    desiredSpeed: 6,  // commanded speed
+    speed: 8,         // current speed (kt)
+    desiredSpeed: 8,  // commanded speed
     depth: 200,
     targetDepth: 200,
     hull: 100,
@@ -384,7 +400,9 @@ function startWave(n) {
   const types = ['patrol', 'patrol', 'hunter', 'swarm', 'ace'];
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
-    const r = 4500 + Math.random() * 1500;
+    // First enemy is close so the player sees action within 5 seconds.
+    // Rest are spread further out so they patrol in.
+    const r = (i === 0) ? (900 + Math.random() * 600) : (2500 + Math.random() * 2500);
     const x = Math.cos(angle) * r;
     const y = Math.sin(angle) * r;
     // type weights: more hunters/ace in later waves
@@ -409,14 +427,37 @@ function showWave(n, count) {
   setTimeout(() => { w.classList.remove('show'); s.classList.remove('show'); }, 2500);
 }
 
+function showWaveClear(n) {
+  // Bonus for clean wave
+  const bonus = 200 + n * 100;
+  state.score += bonus;
+  const w = document.getElementById('wave');
+  const s = document.getElementById('waveSub');
+  w.textContent = `WAVE ${n} CLEAR`;
+  w.style.color = '#00e676';
+  w.style.textShadow = '0 0 30px #00e676';
+  s.textContent = `+${bonus} BONUS — NEXT WAVE INCOMING`;
+  s.style.color = '#00e676';
+  w.classList.add('show');
+  s.classList.add('show');
+  setTimeout(() => {
+    w.classList.remove('show'); s.classList.remove('show');
+    w.style.color = ''; w.style.textShadow = '';
+    s.style.color = '';
+  }, 2500);
+  Audio.killStinger();
+  state.killStreak = 0;
+}
+
 function checkWaveEnd() {
   if (state.mode !== 'play') return;
   const alive = state.enemies.filter(e => e.hull > 0).length;
   if (alive === 0) {
+    showWaveClear(state.wave);
     // next wave after a brief delay
     setTimeout(() => {
       if (state.mode === 'play') startWave(state.wave + 1);
-    }, 2000);
+    }, 2800);
   }
 }
 
@@ -657,9 +698,9 @@ function updatePlayer(dt) {
     const w = screenToWorld(state.mouseX, state.mouseY);
     const targetH = Math.atan2(w.x - p.x, w.y - p.y) * 180 / Math.PI;
     const delta = ((targetH - p.heading + 540) % 360) - 180;
-    p.heading += Math.sign(delta) * Math.min(Math.abs(delta), 90 * dt);
+    p.heading += Math.sign(delta) * Math.min(Math.abs(delta), 130 * dt);
   } else {
-    p.heading += turnInput * 120 * dt;
+    p.heading += turnInput * 160 * dt;
   }
   p.heading = (p.heading + 360) % 360;
 
@@ -683,6 +724,29 @@ function updatePlayer(dt) {
   if (p.x > HALF - margin) p.x = HALF - margin;
   if (p.y < -HALF + margin) p.y = -HALF + margin;
   if (p.y > HALF - margin) p.y = HALF - margin;
+
+  // propeller wash — bubbles trail behind the sub when moving
+  if (p.speed > 2 && Math.random() < (p.speed / 11) * dt * 4) {
+    const sternX = p.x - Math.sin(p.heading * Math.PI / 180) * 20;
+    const sternY = p.y - Math.cos(p.heading * Math.PI / 180) * 20;
+    state.bubbles.push({
+      x: sternX + (Math.random() - 0.5) * 6,
+      y: sternY + (Math.random() - 0.5) * 6,
+      life: 1.2 + Math.random() * 0.8,
+      maxLife: 2,
+      size: 1.2 + Math.random() * 1.8,
+    });
+  }
+  // bow wave when at speed
+  if (p.speed > 5 && Math.random() < dt * 6) {
+    const bowX = p.x + Math.sin(p.heading * Math.PI / 180) * 22;
+    const bowY = p.y + Math.cos(p.heading * Math.PI / 180) * 22;
+    state.bubbles.push({
+      x: bowX + (Math.random() - 0.5) * 10,
+      y: bowY + (Math.random() - 0.5) * 6,
+      life: 0.6, maxLife: 0.6, size: 0.8 + Math.random(),
+    });
+  }
 
   // reload
   if (p.cooldown > 0) p.cooldown -= dt;
@@ -723,6 +787,7 @@ function updateEnemies(dt) {
     if (e.hull <= 0) continue;
     e.aiT += dt;
     if (e.cooldown > 0) e.cooldown -= dt;
+    if (e.hitFlash > 0) e.hitFlash = Math.max(0, e.hitFlash - dt);
 
     const d = Math.hypot(p.x - e.x, p.y - e.y);
     // awareness based on player speed/noise
@@ -855,16 +920,36 @@ function updateTorpedoes(dt) {
         if (e.hull <= 0) continue;
         if (Math.hypot(e.x - t.x, e.y - t.y) < 50) {
           e.hull -= 60 + Math.random() * 20;
+          e.hitFlash = 0.2;  // visual flash on enemy
           t.life = 0;
           explodeAt(t.x, t.y, 30, '#ff8800');
           Audio.hit();
           if (e.hull <= 0) {
             state.kills++;
-            state.score += 100 + (e.type === 'ace' ? 500 : e.type === 'hunter' ? 200 : 50);
+            const bonus = e.type === 'ace' ? 500 : e.type === 'hunter' ? 200 : 50;
+            state.score += 100 + bonus;
             state.waveKilled++;
             explodeAt(e.x, e.y, 80, '#ff3d3d');
             state.shake = Math.max(state.shake, 0.6);
             Audio.explosion();
+            Audio.killStinger();
+            // floating score popup
+            state.popups = state.popups || [];
+            state.popups.push({
+              x: e.x, y: e.y, vy: -0.4,
+              life: 1.6, maxLife: 1.6,
+              text: '+' + (100 + bonus), color: '#00e676',
+            });
+            state.killStreak = (state.killStreak || 0) + 1;
+            state.lastKillT = state.time;
+          } else {
+            // small hit popup
+            state.popups = state.popups || [];
+            state.popups.push({
+              x: e.x, y: e.y, vy: -0.2,
+              life: 0.8, maxLife: 0.8,
+              text: 'HIT', color: '#ffb300',
+            });
           }
           break;
         }
@@ -936,6 +1021,13 @@ function updateParticles(dt) {
     d.y += Math.cos(d.heading * Math.PI / 180) * d.speed * dt;
   }
   state.decoys = state.decoys.filter(d => d.life > 0);
+  // popups (floating score text)
+  state.popups = state.popups || [];
+  for (const p of state.popups) {
+    p.life -= dt;
+    p.y += p.vy * 60 * dt;
+  }
+  state.popups = state.popups.filter(p => p.life > 0);
   if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 2);
 }
 
@@ -995,10 +1087,43 @@ function render() {
   // Mouse aim crosshair
   renderCrosshair();
 
+  // Score popups
+  for (const p of state.popups) renderPopup(p);
+
   // Selected target reticle
   renderTargetReticle();
 
   ctx.restore();
+
+  // Low-hull red vignette (over everything)
+  renderLowHullVignette();
+
+  // KILL big text on chain kills
+  if (state.killStreak >= 2 && state.time - (state.lastKillT || 0) < 1.2) {
+    const t = (state.time - state.lastKillT) / 0.7;
+    const a = 1 - t;
+    const W2 = window.innerWidth;
+    const labels = ['', '', 'DOUBLE KILL!', 'TRIPLE KILL!', 'QUAD KILL!', 'MEGA KILL!'];
+    const lbl = labels[Math.min(state.killStreak, labels.length - 1)];
+    ctx.save();
+    ctx.font = 'bold 64px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = `rgba(0, 230, 118, ${a})`;
+    ctx.shadowColor = '#00e676';
+    ctx.shadowBlur = 24;
+    const scale = 0.7 + (1 - t) * 0.6;
+    ctx.translate(W2/2, window.innerHeight * 0.25);
+    ctx.scale(scale, scale);
+    ctx.fillText(lbl, 0, 0);
+    ctx.restore();
+  }
+
+  // Kill streak flash
+  if (state.killStreak >= 3 && state.time - (state.lastKillT || 0) < 0.6) {
+    const a = 1 - (state.time - state.lastKillT) / 0.6;
+    ctx.fillStyle = `rgba(0, 230, 118, ${a * 0.18})`;
+    ctx.fillRect(0, 0, W, H);
+  }
 }
 
 function renderWater(W, H) {
@@ -1016,21 +1141,31 @@ function renderWater(W, H) {
   const camWorldX = state.camX;
   const camWorldY = state.camY;
   ctx.save();
-  ctx.globalAlpha = 0.06;
-  for (let i = 0; i < 30; i++) {
-    const ox = (i * 700 + frame * 0.4) % (W + 400) - 200;
-    const oy = (i * 230 + Math.sin(frame * 0.01 + i) * 50) % H;
-    const w = 80 + (i % 4) * 40;
+  ctx.globalAlpha = 0.10;
+  for (let i = 0; i < 45; i++) {
+    const ox = (i * 500 + frame * 0.5) % (W + 400) - 200;
+    const oy = (i * 180 + Math.sin(frame * 0.012 + i * 0.7) * 60) % H;
+    const w = 100 + (i % 4) * 50;
     const grad = ctx.createLinearGradient(ox, oy, ox, oy + w);
-    grad.addColorStop(0, 'rgba(150, 220, 255, 0.5)');
-    grad.addColorStop(1, 'rgba(150, 220, 255, 0)');
+    grad.addColorStop(0, 'rgba(180, 240, 255, 0.7)');
+    grad.addColorStop(1, 'rgba(180, 240, 255, 0)');
     ctx.fillStyle = grad;
     ctx.beginPath();
     ctx.moveTo(ox, oy);
     ctx.lineTo(ox + w, oy);
-    ctx.lineTo(ox + w - 30, oy + w);
-    ctx.lineTo(ox - 30, oy + w);
+    ctx.lineTo(ox + w - 40, oy + w);
+    ctx.lineTo(ox - 40, oy + w);
     ctx.closePath();
+    ctx.fill();
+  }
+  // depth haze particles
+  ctx.globalAlpha = 0.04;
+  for (let i = 0; i < 20; i++) {
+    const x = (i * 137 + frame * 0.3) % W;
+    const y = (i * 89 + frame * 0.2) % H;
+    ctx.fillStyle = '#9fdfff';
+    ctx.beginPath();
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -1133,59 +1268,76 @@ function drawSubShape(scale, alpha = 1) {
   ctx.scale(scale, scale);
   ctx.globalAlpha = alpha;
   // hull shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.beginPath();
-  ctx.ellipse(0, 4, 22, 6, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 5, 24, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   // hull
-  const grad = ctx.createLinearGradient(0, -8, 0, 8);
-  grad.addColorStop(0, '#f0c050');
-  grad.addColorStop(0.5, '#d4a020');
-  grad.addColorStop(1, '#806010');
+  const grad = ctx.createLinearGradient(0, -10, 0, 10);
+  grad.addColorStop(0, '#ffe080');
+  grad.addColorStop(0.4, '#ffc830');
+  grad.addColorStop(1, '#a07010');
   ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 24, 10, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#000';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.stroke();
   // bow point
-  ctx.fillStyle = '#f0c050';
+  ctx.fillStyle = '#ffe080';
   ctx.beginPath();
-  ctx.moveTo(22, 0);
-  ctx.lineTo(14, -5);
-  ctx.lineTo(14, 5);
+  ctx.moveTo(24, 0);
+  ctx.lineTo(15, -6);
+  ctx.lineTo(15, 6);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  // conning tower
-  ctx.fillStyle = '#806010';
-  ctx.fillRect(-5, -7, 10, 4);
-  ctx.strokeRect(-5, -7, 10, 4);
-  ctx.fillStyle = '#404000';
-  ctx.fillRect(-3, -10, 6, 3);
-  // periscope
-  ctx.fillStyle = '#222';
-  ctx.fillRect(0, -14, 1, 4);
-  // fins (sail planes)
+  // conning tower (bigger and more visible)
   ctx.fillStyle = '#a07010';
+  ctx.fillRect(-6, -9, 12, 5);
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(-6, -9, 12, 5);
+  // periscope (taller, with red light)
+  ctx.fillStyle = '#222';
+  ctx.fillRect(-0.5, -16, 1, 7);
+  ctx.fillStyle = '#ff3d3d';
   ctx.beginPath();
-  ctx.moveTo(-18, 0);
-  ctx.lineTo(-22, -8);
-  ctx.lineTo(-14, 0);
+  ctx.arc(0, -16, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+  // fins (sail planes)
+  ctx.fillStyle = '#c89020';
+  ctx.beginPath();
+  ctx.moveTo(-20, 0);
+  ctx.lineTo(-24, -9);
+  ctx.lineTo(-15, 0);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(-18, 0);
-  ctx.lineTo(-22, 8);
-  ctx.lineTo(-14, 0);
+  ctx.moveTo(-20, 0);
+  ctx.lineTo(-24, 9);
+  ctx.lineTo(-15, 0);
   ctx.closePath();
   ctx.fill();
-  // propeller
+  ctx.stroke();
+  // propeller (spinning)
   ctx.fillStyle = '#ff4040';
+  const propAng = (frame * 0.4) % (Math.PI * 2);
+  ctx.save();
+  ctx.translate(-24, 0);
+  ctx.rotate(propAng);
+  ctx.fillRect(-2, -5, 4, 10);
+  ctx.fillRect(-5, -2, 10, 4);
+  ctx.restore();
   ctx.beginPath();
-  ctx.arc(-22, 0, 3, 0, Math.PI * 2);
+  ctx.arc(-24, 0, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffe080';
   ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1;
+  ctx.stroke();
 }
 
 function renderSub(sub, isPlayer) {
@@ -1205,23 +1357,48 @@ function renderSub(sub, isPlayer) {
   } else {
     // enemy: red
     ctx.save();
-    const grad = ctx.createLinearGradient(0, -8, 0, 8);
-    grad.addColorStop(0, '#ff5050');
-    grad.addColorStop(0.5, '#c02020');
-    grad.addColorStop(1, '#601010');
+    // hit flash — white-out for a moment
+    const flash = sub.hitFlash || 0;
+    ctx.scale(state.camZoom, state.camZoom);  // explicit scale for enemy shape
+    const grad = ctx.createLinearGradient(0, -10, 0, 10);
+    if (flash > 0) {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#ffeeaa');
+      grad.addColorStop(1, '#ffaa44');
+    } else {
+      grad.addColorStop(0, '#ff8080');
+      grad.addColorStop(0.5, '#d02020');
+      grad.addColorStop(1, '#601010');
+    }
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 24, 10, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 2;
     ctx.stroke();
+    // conning tower
     ctx.fillStyle = '#600000';
-    ctx.fillRect(-5, -7, 10, 4);
-    ctx.strokeRect(-5, -7, 10, 4);
-    ctx.fillStyle = '#ff4040';
+    ctx.fillRect(-6, -9, 12, 5);
+    ctx.strokeRect(-6, -9, 12, 5);
+    // periscope
+    ctx.fillStyle = '#222';
+    ctx.fillRect(-0.5, -14, 1, 5);
+    ctx.fillStyle = '#ff3d3d';
     ctx.beginPath();
-    ctx.arc(-22, 0, 3, 0, Math.PI * 2);
+    ctx.arc(0, -14, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    // propeller
+    ctx.save();
+    ctx.translate(-24, 0);
+    ctx.rotate((frame * 0.3) % (Math.PI * 2));
+    ctx.fillStyle = '#ff4040';
+    ctx.fillRect(-2, -4, 4, 8);
+    ctx.fillRect(-4, -2, 8, 4);
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(-24, 0, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ff6060';
     ctx.fill();
     // type indicator
     if (sub.type === 'ace') {
@@ -1229,27 +1406,27 @@ function renderSub(sub, isPlayer) {
       ctx.strokeStyle = '#ffd700';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, 25, 11, 0, 0, Math.PI * 2);
       ctx.stroke();
     }
     if (sub.type === 'hunter') {
       // bigger fins
       ctx.fillStyle = '#600000';
       ctx.beginPath();
-      ctx.moveTo(-18, 0);
-      ctx.lineTo(-26, -10);
-      ctx.lineTo(-14, 0);
+      ctx.moveTo(-20, 0);
+      ctx.lineTo(-29, -11);
+      ctx.lineTo(-15, 0);
       ctx.closePath();
       ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(-18, 0);
-      ctx.lineTo(-26, 10);
-      ctx.lineTo(-14, 0);
+      ctx.moveTo(-20, 0);
+      ctx.lineTo(-29, 11);
+      ctx.lineTo(-15, 0);
       ctx.closePath();
       ctx.fill();
     }
     if (sub.type === 'swarm') {
-      // smaller
+      // smaller — invert the scale we just applied
       ctx.scale(0.7, 0.7);
     }
     ctx.restore();
@@ -1296,23 +1473,33 @@ function renderTorpedo(t) {
   const col = t.owner === 'player' ? '#00e5ff' : '#ff5050';
   // body
   ctx.fillStyle = col;
-  ctx.fillRect(-6, -2, 12, 4);
+  ctx.fillRect(-7, -3, 14, 6);
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 0.5;
-  ctx.strokeRect(-6, -2, 12, 4);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-7, -3, 14, 6);
   // tip
   ctx.fillStyle = '#fff';
   ctx.beginPath();
-  ctx.moveTo(6, 0);
-  ctx.lineTo(3, -2);
-  ctx.lineTo(3, 2);
+  ctx.moveTo(7, 0);
+  ctx.lineTo(3, -3);
+  ctx.lineTo(3, 3);
   ctx.closePath();
   ctx.fill();
+  // fins
+  ctx.fillStyle = col;
+  ctx.fillRect(-7, -5, 2, 2);
+  ctx.fillRect(-7, 3, 2, 2);
   // glow
   ctx.restore();
-  ctx.fillStyle = col + '40';
+  // outer glow
+  ctx.fillStyle = col + '60';
   ctx.beginPath();
-  ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+  ctx.arc(s.x, s.y, 12, 0, Math.PI * 2);
+  ctx.fill();
+  // bright center
+  ctx.fillStyle = col + 'aa';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -1349,6 +1536,34 @@ function renderParticle(p) {
   }
 }
 
+function renderPopup(p) {
+  const s = worldToScreen(p.x, p.y);
+  const a = Math.max(0, p.life / p.maxLife);
+  ctx.globalAlpha = a;
+  ctx.font = 'bold 18px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = p.color;
+  ctx.shadowColor = p.color;
+  ctx.shadowBlur = 8;
+  ctx.fillText(p.text, s.x, s.y);
+  ctx.shadowBlur = 0;
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+}
+
+// Low-hull red vignette
+function renderLowHullVignette() {
+  const p = state.player;
+  if (!p || p.hull > 35) return;
+  const t = 1 - p.hull / 35;
+  const W = window.innerWidth, H = window.innerHeight;
+  const grad = ctx.createRadialGradient(W/2, H/2, Math.min(W, H) * 0.4, W/2, H/2, Math.max(W, H) * 0.7);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  grad.addColorStop(1, `rgba(255, 30, 30, ${0.4 + Math.sin(state.time * 6) * 0.15})`);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+}
+
 function renderDecoy(d) {
   const s = worldToScreen(d.x, d.y);
   if (s.x < -20 || s.x > window.innerWidth + 20) return;
@@ -1382,10 +1597,12 @@ function renderCrosshair() {
   ctx.moveTo(x, y - 18); ctx.lineTo(x, y - 8);
   ctx.moveTo(x, y + 8); ctx.lineTo(x, y + 18);
   ctx.stroke();
-  // aim line from player
-  if (state.player) {
+  // aim line from player only when no turn key held and mouse is over canvas
+  const turnHeld = (keys['a'] || keys['arrowleft'] || keys['d'] || keys['arrowright'] ||
+    Math.abs(joystickVec.x) > 0.1);
+  if (!turnHeld && state.player) {
     const ps = worldToScreen(state.player.x, state.player.y);
-    ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.18)';
     ctx.setLineDash([3, 6]);
     ctx.beginPath();
     ctx.moveTo(ps.x, ps.y);
@@ -1488,7 +1705,13 @@ function updateHUD() {
   document.getElementById('hudDepth').textContent = Math.round(p.depth);
   document.getElementById('hudDepth').className = 'v' + (p.depth > 380 ? ' bad' : p.depth > 250 ? ' warn' : '');
   document.getElementById('hudWave').textContent = state.wave;
-  document.getElementById('hudContacts').textContent = state.enemies.filter(e => e.hull > 0).length;
+  // Contacts = enemies that have detected us OR are within 3 screen widths
+  const visRange = (window.innerWidth / state.camZoom) * 1.4;
+  const seenContacts = state.enemies.filter(e => {
+    if (e.hull <= 0) return false;
+    return e.sawPlayer || Math.hypot(e.x - p.x, e.y - p.y) < visRange;
+  }).length;
+  document.getElementById('hudContacts').textContent = seenContacts;
   document.getElementById('hudKills').textContent = state.kills;
   document.getElementById('hudScore').textContent = state.score;
   document.getElementById('hudReload').textContent = p.cooldown > 0 ? p.cooldown.toFixed(1) + 's' : 'READY';
@@ -1547,8 +1770,11 @@ function startGame() {
   state.particles = [];
   state.bubbles = [];
   state.decoys = [];
+  state.popups = [];
   state.selectedTarget = null;
   state.nextId = 0;
+  state.killStreak = 0;
+  state.lastKillT = -10;
   state.player = makePlayer();
   generateTerrain();
   startWave(1);
@@ -1560,6 +1786,10 @@ document.getElementById('startBtn').addEventListener('click', () => {
   Audio.init();
   document.getElementById('startScreen').classList.add('hidden');
   startGame();
+  // Opening cinematic: auto-ping after 1.5s to give the player immediate intel
+  setTimeout(() => {
+    if (state.mode === 'play') doPing();
+  }, 1500);
 });
 document.getElementById('restartBtn').addEventListener('click', () => {
   document.getElementById('endScreen').classList.remove('show');
