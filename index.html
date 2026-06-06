@@ -346,11 +346,11 @@ class Sub {
   }
   get inLayer() { return this.depth >= CFG.THERMAL_TOP && this.depth <= CFG.THERMAL_BOT; }
   get noise() {
-    if (this.speed < 2) return 0.02;
-    if (this.speed < 6) return 0.08;
-    if (this.speed < 14) return 0.25;
-    if (this.speed < 20) return 0.55;
-    return 0.9;
+    if (this.speed < 2) return 0.06; // silent running — still detectable at close range
+    if (this.speed < 6) return 0.15; // creep
+    if (this.speed < 14) return 0.4; // cruise
+    if (this.speed < 20) return 0.7; // flank
+    return 1.0; // overload
   }
   get detectability() {
     let d = this.noise;
@@ -556,7 +556,10 @@ function updateContacts() {
       if (ex) {
         ex.x = nx; ex.y = ny; ex.depth = e.depth; ex.strength = dp; ex.age = 0;
       } else {
-        G.contacts.push({ id: 'C' + (G.contacts.length + 1), x: nx, y: ny, depth: e.depth, strength: dp, src: e, age: 0, isDecoy: false, class: classify(dp) });
+        let newContact = { id: 'C' + (G.contacts.length + 1), x: nx, y: ny, depth: e.depth, strength: dp, src: e, age: 0, isDecoy: false, class: classify(dp) };
+        G.contacts.push(newContact);
+        let brg = Math.round(((G.player.bearingTo({ x: newContact.x, y: newContact.y }) + 360) % 360));
+        callout(`New contact ${newContact.id} at bearing ${brg}° — possible submarine.`, 'info');
       }
     }
   }
@@ -606,8 +609,8 @@ function startMission(n) {
   let types = G.mission.enemies;
   for (let cls of types) {
     let angle = rnd(0, Math.PI * 2), dist = rnd(800, 1500);
-    let e = new Sub(Math.cos(angle) * dist, Math.sin(angle) * dist, rnd(100, 350), rnd(0, Math.PI * 2), false, cls);
-    e.targetSpeed = 3 + Math.random() * 3;
+    let e = new Sub(Math.cos(angle) * dist, Math.sin(angle) * dist, rnd(100, 140), rnd(0, Math.PI * 2), false, cls); // spawn SHALLOW (above thermal layer) so detectable
+    e.targetSpeed = 8 + Math.random() * 6; // cruise at 8-14 kts — noise 0.25 (detectable)
     G.enemies.push(e);
   }
   G.phase = 'playing';
