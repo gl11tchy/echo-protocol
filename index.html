@@ -1099,7 +1099,7 @@ function update(dt) {
     t.x += Math.sin(t.heading * Math.PI / 180) * t.speed * dt;
     t.y += Math.cos(t.heading * Math.PI / 180) * t.speed * dt;
     // wake trail
-    if (Math.random() < 5) {
+    if (Math.random() < 0.5) {
       state.wakeTrails.push({
         x: t.x - Math.sin(t.heading * Math.PI / 180) * 5,
         y: t.y - Math.cos(t.heading * Math.PI / 180) * 5,
@@ -1547,6 +1547,7 @@ function loop(t) {
 // ----------------------------------------------------------------------------
 window.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
+  if (e.repeat) return;  // ignore OS auto-repeat
   state.keys[k] = true;
   if (k === ' ') { e.preventDefault(); doPing(); }
   if (k === 'f') doFire();
