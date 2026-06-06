@@ -558,15 +558,16 @@ function tryFire() {
     aimX = w.x; aimY = w.y;
   }
   const heading = Math.atan2(aimX - p.x, aimY - p.y) * 180 / Math.PI;
+  const normalized = (heading + 360) % 360;
   const bowOffset = 18;
   state.torpedoes.push({
     x: p.x + Math.sin(heading * Math.PI / 180) * bowOffset,
     y: p.y + Math.cos(heading * Math.PI / 180) * bowOffset,
-    heading,
+    heading: normalized,
     speed: 32,
     owner: 'player',
     target: target,  // may be null
-    life: 8,
+    life: 20,
     age: 0,
     bubbles: 0,
   });
@@ -782,14 +783,15 @@ function eFireTorpedo(e, p) {
   const tx = p.x + Math.sin(p.heading * Math.PI / 180) * lead * p.speed * 0.3;
   const ty = p.y + Math.cos(p.heading * Math.PI / 180) * lead * p.speed * 0.3;
   const h2 = Math.atan2(tx - e.x, ty - e.y) * 180 / Math.PI;
+  const h2n = (h2 + 360) % 360;
   state.torpedoes.push({
-    x: e.x + Math.sin(h2 * Math.PI / 180) * 18,
-    y: e.y + Math.cos(h2 * Math.PI / 180) * 18,
-    heading: h2,
+    x: e.x + Math.sin(h2n * Math.PI / 180) * 18,
+    y: e.y + Math.cos(h2n * Math.PI / 180) * 18,
+    heading: h2n,
     speed: 22,
     owner: 'enemy',
     target: p,
-    life: 10,
+    life: 25,
     age: 0,
   });
   Audio.torpedo(true);
@@ -835,7 +837,7 @@ function updateTorpedoes(dt) {
     if (t.owner === 'player') {
       for (const e of state.enemies) {
         if (e.hull <= 0) continue;
-        if (Math.hypot(e.x - t.x, e.y - t.y) < 22) {
+        if (Math.hypot(e.x - t.x, e.y - t.y) < 35) {
           e.hull -= 60 + Math.random() * 20;
           t.life = 0;
           explodeAt(t.x, t.y, 30, '#ff8800');
@@ -854,7 +856,7 @@ function updateTorpedoes(dt) {
     } else {
       // enemy torp hit player
       const p = state.player;
-      if (p && Math.hypot(p.x - t.x, p.y - t.y) < 24) {
+      if (p && Math.hypot(p.x - t.x, p.y - t.y) < 30) {
         if (p.invuln <= 0) {
           p.hull -= 25 + Math.random() * 15;
           p.invuln = 0.5;
