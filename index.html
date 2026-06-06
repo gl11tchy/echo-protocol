@@ -419,8 +419,9 @@ class Sub {
 
     switch (this.aiState) {
       case 'patrol':
-        this.targetSpeed = 3 + Math.random() * 3;
-        this.hdg += rnd(-0.02, 0.02);
+        // Maintain cruise speed unless detecting something
+        if (this.targetSpeed < 6) this.targetSpeed = 8 + Math.random() * 4;
+        this.hdg += rnd(-0.015, 0.015); // gentle heading changes (no sharp turns at cruise)
         if (canDetect && dist < 2500) { this.aiState = 'stalk'; this.aiTimer = rnd(4, 10); }
         break;
       case 'stalk':
