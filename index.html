@@ -413,7 +413,7 @@ class Sub {
   updateAI(dt, player) {
     this.aiTimer -= dt; this.aiDecoyC -= dt; this.aiPingC -= dt;
     let dist = this.distTo(player);
-    let canDetect = dist < 3000 && this.cls !== 'ace' ? player.detectability > 0.1 : player.detectability > 0.05;
+    let canDetect = dist < 3000 && (this.cls !== 'ace' ? player.detectability > 0.1 : player.detectability > 0.05);
     if (canDetect) { this.aiCertainty = Math.min(1, this.aiCertainty + dt * 0.3); this.aiLastKnown = { x: player.x, y: player.y, depth: player.depth, t: G.time }; }
     else this.aiCertainty = Math.max(0, this.aiCertainty - dt * 0.1);
 
