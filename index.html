@@ -807,21 +807,33 @@ function eFireTorpedo(e, p) {
 function updateTorpedoes(dt) {
   for (const t of state.torpedoes) {
     t.age += dt;
-    // seek target
+    // seek target with lead
     if (t.target) {
-      let tx, ty;
+      let tx, ty, targetSpeed = 0, targetHeading = 0;
       if (t.target === state.player) {
         tx = t.target.x; ty = t.target.y;
+        targetSpeed = state.player.speed * 0.8;
+        targetHeading = state.player.heading;
       } else if (t.target.hull !== undefined) {
         if (t.target.hull <= 0) { t.target = null; continue; }
         tx = t.target.x; ty = t.target.y;
+        targetSpeed = t.target.speed * 0.8;
+        targetHeading = t.target.heading;
       } else {
         // decoy
         tx = t.target.x; ty = t.target.y;
+        targetSpeed = t.target.speed;
+        targetHeading = t.target.heading;
       }
-      const targetH = Math.atan2(tx - t.x, ty - t.y) * 180 / Math.PI;
+      // lead prediction
+      const timeToTarget = Math.hypot(tx - t.x, ty - t.y) / t.speed;
+      const leadX = Math.sin(targetHeading * Math.PI / 180) * targetSpeed * timeToTarget;
+      const leadY = Math.cos(targetHeading * Math.PI / 180) * targetSpeed * timeToTarget;
+      const aimX = tx + leadX;
+      const aimY = ty + leadY;
+      const targetH = (Math.atan2(aimX - t.x, aimY - t.y) * 180 / Math.PI + 360) % 360;
       const delta = ((targetH - t.heading + 540) % 360) - 180;
-      t.heading += Math.sign(delta) * Math.min(Math.abs(delta), 80 * dt);
+      t.heading += Math.sign(delta) * Math.min(Math.abs(delta), 90 * dt);
     }
     t.x += Math.sin(t.heading * Math.PI / 180) * t.speed * dt;
     t.y += Math.cos(t.heading * Math.PI / 180) * t.speed * dt;
@@ -837,7 +849,7 @@ function updateTorpedoes(dt) {
     if (t.owner === 'player') {
       for (const e of state.enemies) {
         if (e.hull <= 0) continue;
-        if (Math.hypot(e.x - t.x, e.y - t.y) < 35) {
+        if (Math.hypot(e.x - t.x, e.y - t.y) < 50) {
           e.hull -= 60 + Math.random() * 20;
           t.life = 0;
           explodeAt(t.x, t.y, 30, '#ff8800');
