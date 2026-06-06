@@ -4,1653 +4,1532 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>ECHO PROTOCOL</title>
+<title>ECHO PROTOCOL — Submarine Action</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'SF Mono', 'Menlo', 'Consolas', monospace; color: #c8d4e0; user-select: none; -webkit-user-select: none; touch-action: none; }
-  #app { position: relative; width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-
-  /* TOP BAR */
-  #topbar { display: flex; align-items: center; gap: 18px; padding: 8px 14px; background: #0a0e14; border-bottom: 1px solid #1a2530; font-size: 12px; flex-shrink: 0; }
-  .tb { display: flex; gap: 4px; align-items: baseline; }
-  .tb .l { color: #4a5868; font-size: 10px; letter-spacing: 1px; }
-  .tb .v { color: #e8f0f8; font-weight: bold; font-size: 13px; min-width: 30px; }
-  .tb .v.warn { color: #ffb300; }
-  .tb .v.bad { color: #ff3d3d; animation: blink 0.6s infinite; }
-  @keyframes blink { 50% { opacity: 0.3; } }
-  #sig-val { color: #00e676; }
-  #sig-val.med { color: #ffb300; }
-  #sig-val.high { color: #ff3d3d; }
-
-  /* MAP - the playable area */
-  #map { position: relative; flex: 1; background: #051018; overflow: hidden; cursor: crosshair; }
-  #map canvas { display: block; width: 100%; height: 100%; }
-
-  /* RIGHT PANEL */
-  #panel { position: absolute; top: 41px; right: 0; width: 280px; height: calc(100vh - 41px - 110px); background: rgba(10,14,20,0.92); border-left: 1px solid #1a2530; padding: 10px; overflow-y: auto; font-size: 11px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-  @media (max-width: 800px) { #panel { display: none; } }
-  .section { margin-bottom: 14px; }
-  .section h3 { color: #4a5868; font-size: 9px; letter-spacing: 2px; margin-bottom: 6px; text-transform: uppercase; }
-  .contact { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-left: 2px solid transparent; cursor: pointer; margin-bottom: 2px; }
-  .contact.selected { border-left-color: #00e5ff; background: rgba(0,229,255,0.08); }
-  .contact.sel-target { border-left-color: #ff3d3d; }
-  .contact .id { color: #00e5ff; font-weight: bold; width: 24px; }
-  .contact .brg { color: #e8f0f8; width: 50px; }
-  .contact .rng { color: #4a5868; width: 50px; text-align: right; }
-  .contact .cls { flex: 1; color: #c8d4e0; font-size: 10px; }
-  .contact.hostile .cls { color: #ff8080; }
-  .contact.unknown .cls { color: #ffb300; }
-  .contact.friendly .cls { color: #80ff80; }
-  .gauge { height: 5px; background: #1a2530; border-radius: 2px; margin: 3px 0; overflow: hidden; }
-  .gauge .fill { height: 100%; transition: width 0.2s; border-radius: 2px; }
-  .fill-green { background: #00e676; }
-  .fill-amber { background: #ffb300; }
-  .fill-red { background: #ff3d3d; }
-  .fill-cyan { background: #00e5ff; }
-  .stat-line { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
-  .stat-line .l { color: #4a5868; }
-  .stat-line .v { color: #e8f0f8; font-weight: bold; }
-  .stat-line .v.bad { color: #ff3d3d; }
-  .stat-line .v.good { color: #00e676; }
-  .prob-stack { margin-top: 4px; }
-  .prob-row { display: flex; align-items: center; gap: 4px; font-size: 10px; margin-bottom: 2px; }
-  .prob-row .lbl { width: 60px; color: #4a5868; }
-  .prob-row .pct { width: 35px; text-align: right; color: #e8f0f8; }
-  .prob-row .bar { flex: 1; height: 4px; background: #1a2530; border-radius: 2px; overflow: hidden; }
-  .prob-row .bar .b { height: 100%; }
-
-  /* BOTTOM CONTROLS */
-  #controls { display: flex; align-items: center; justify-content: space-between; padding: 10px; background: #0a0e14; border-top: 1px solid #1a2530; flex-shrink: 0; gap: 8px; flex-wrap: wrap; }
-  .ctrl-group { display: flex; gap: 6px; align-items: center; }
-  .ctrl-group .label { color: #4a5868; font-size: 10px; letter-spacing: 1px; margin-right: 4px; }
-  button { font-family: inherit; background: #15202b; color: #c8d4e0; border: 1px solid #2a3845; padding: 10px 14px; font-size: 12px; letter-spacing: 1px; cursor: pointer; border-radius: 3px; transition: background 0.1s; min-width: 44px; min-height: 44px; }
-  button:hover:not(:disabled) { background: #1f2c3a; border-color: #3a4a5a; }
-  button:active:not(:disabled) { background: #00e5ff; color: #000; }
-  button:disabled { opacity: 0.3; cursor: not-allowed; }
-  button.primary { background: #003a4a; border-color: #00e5ff; color: #00e5ff; }
-  button.primary:hover:not(:disabled) { background: #00566e; }
-  button.danger { background: #4a0010; border-color: #ff3d3d; color: #ff8080; }
-  button.danger:hover:not(:disabled) { background: #6a0018; }
-  button.warn { background: #4a3500; border-color: #ffb300; color: #ffb300; }
-  button.warn:hover:not(:disabled) { background: #6a4d00; }
-  button.selected { background: #00e5ff; color: #000; border-color: #00e5ff; }
-
-  /* D-PAD for mobile */
-  #dpad { display: none; position: absolute; left: 10px; bottom: 130px; width: 140px; height: 140px; }
-  @media (max-width: 800px) { #dpad { display: block; } }
-  .dpad-btn { position: absolute; width: 44px; height: 44px; background: rgba(0,229,255,0.15); border: 1px solid #00e5ff; color: #00e5ff; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: bold; }
-  .dpad-btn:active { background: #00e5ff; color: #000; }
-  .dpad-up { top: 0; left: 48px; }
-  .dpad-down { bottom: 0; left: 48px; }
-  .dpad-left { left: 0; top: 48px; }
-  .dpad-right { right: 0; top: 48px; }
-
-  /* MOBILE PANEL TOGGLE */
-  #mob-panel-btn { display: none; position: absolute; top: 50px; right: 10px; z-index: 5; }
-  @media (max-width: 800px) { #mob-panel-btn { display: block; } }
-
-  /* OVERLAY */
-  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
-  #overlay.hidden { display: none; }
-  #overlay h1 { color: #00e5ff; font-size: 36px; letter-spacing: 8px; margin-bottom: 4px; }
-  #overlay h2 { color: #4a5868; font-size: 12px; letter-spacing: 4px; margin-bottom: 30px; }
-  #overlay .brief { color: #c8d4e0; font-size: 13px; max-width: 540px; line-height: 1.7; margin-bottom: 24px; }
-  #overlay .controls-list { color: #8a98a8; font-size: 11px; margin-bottom: 28px; line-height: 1.9; max-width: 540px; }
-  #overlay .controls-list b { color: #00e5ff; }
-  #overlay .start-btn { color: #000; background: #00e676; border: none; padding: 14px 36px; font-size: 14px; letter-spacing: 3px; font-weight: bold; cursor: pointer; border-radius: 3px; }
-  #overlay .start-btn:hover { background: #00ff80; }
-  #overlay .mission-info { color: #4a5868; font-size: 11px; margin-top: 12px; }
-  #overlay .result { font-size: 28px; margin-bottom: 8px; }
-  #overlay .result.win { color: #00e676; }
-  #overlay .result.lose { color: #ff3d3d; }
-
-  /* BRIEF POPUP */
-  .toast { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); background: rgba(10,14,20,0.95); border: 1px solid #00e5ff; padding: 8px 16px; font-size: 12px; color: #00e5ff; z-index: 50; border-radius: 3px; pointer-events: none; opacity: 0; transition: opacity 0.3s; }
-  .toast.show { opacity: 1; }
-  .toast.warn { border-color: #ffb300; color: #ffb300; }
-  .toast.bad { border-color: #ff3d3d; color: #ff3d3d; }
-  .toast.good { border-color: #00e676; color: #00e676; }
-
-  /* HINT - just below topbar */
-  #hint { position: absolute; top: 46px; left: 14px; color: #4a5868; font-size: 10px; letter-spacing: 1px; pointer-events: none; }
-  @media (max-width: 800px) { #hint { display: none; } }
-
-  /* MINIMAP */
-  #minimap { position: absolute; bottom: 10px; left: 10px; width: 160px; height: 160px; background: rgba(5,16,24,0.85); border: 1px solid #1a2530; border-radius: 3px; pointer-events: none; }
-  @media (max-width: 800px) { #minimap { display: none; } }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'SF Mono', 'Menlo', monospace; color: #c8d4e0; user-select: none; -webkit-user-select: none; touch-action: none; }
+  canvas { display: block; width: 100vw; height: 100vh; image-rendering: auto; }
+  #ui { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  .hud { position: absolute; padding: 10px 14px; background: rgba(8, 14, 22, 0.7); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 3px; font-size: 12px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+  #topLeft { top: 10px; left: 10px; min-width: 180px; }
+  #topRight { top: 10px; right: 10px; min-width: 180px; text-align: right; }
+  #botLeft { bottom: 10px; left: 10px; min-width: 200px; }
+  #botRight { bottom: 10px; right: 10px; min-width: 180px; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+  .l { color: #5a7a90; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; }
+  .v { color: #e8f4ff; font-weight: bold; font-size: 13px; }
+  .v.warn { color: #ffb300; }
+  .v.bad { color: #ff3d3d; animation: pulse 0.5s infinite; }
+  .v.good { color: #00e676; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+  .bar { height: 6px; background: rgba(0,0,0,0.4); border: 1px solid rgba(0, 229, 255, 0.2); border-radius: 2px; margin: 4px 0; overflow: hidden; }
+  .bar .fill { height: 100%; transition: width 0.2s; }
+  .fill-hp { background: linear-gradient(90deg, #ff3d3d, #ff6b6b); }
+  .fill-blue { background: linear-gradient(90deg, #00e5ff, #4dd0e1); }
+  .fill-green { background: linear-gradient(90deg, #00e676, #4caf50); }
+  .key { display: inline-block; padding: 1px 6px; background: rgba(0, 229, 255, 0.15); border: 1px solid rgba(0, 229, 255, 0.4); border-radius: 2px; font-size: 10px; color: #00e5ff; margin: 0 2px; }
+  .controls-hint { color: #5a7a90; font-size: 10px; line-height: 1.6; }
+  .controls-hint .key { font-weight: bold; }
+  #wave { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 32px; color: #00e5ff; text-shadow: 0 0 20px #00e5ff; opacity: 0; transition: opacity 0.5s; pointer-events: none; letter-spacing: 4px; }
+  #wave.show { opacity: 1; }
+  #waveSub { position: absolute; top: calc(50% + 30px); left: 50%; transform: translate(-50%, -50%); font-size: 12px; color: #5a7a90; opacity: 0; transition: opacity 0.5s; pointer-events: none; letter-spacing: 2px; }
+  #waveSub.show { opacity: 1; }
+  #minimap { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 200px; height: 200px; background: rgba(5, 16, 24, 0.8); border: 1px solid rgba(0, 229, 255, 0.3); border-radius: 3px; pointer-events: none; }
+  @media (max-width: 700px) {
+    #minimap { width: 130px; height: 130px; top: 5px; }
+    .hud { padding: 6px 8px; font-size: 10px; min-width: auto; }
+    .v { font-size: 11px; }
+    #topLeft, #topRight { font-size: 9px; }
+    #botLeft .controls-hint { display: none; }
+  }
+  #startScreen { position: fixed; inset: 0; background: rgba(0, 5, 12, 0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
+  #startScreen.hidden { display: none; }
+  #startScreen h1 { color: #00e5ff; font-size: 48px; letter-spacing: 12px; margin-bottom: 4px; text-shadow: 0 0 30px #00e5ff; }
+  #startScreen h2 { color: #5a7a90; font-size: 13px; letter-spacing: 6px; margin-bottom: 32px; }
+  #startScreen .brief { color: #c8d4e0; font-size: 13px; max-width: 540px; line-height: 1.7; margin-bottom: 24px; }
+  #startScreen .brief b { color: #00e5ff; }
+  #startScreen .controls { color: #5a7a90; font-size: 11px; max-width: 540px; line-height: 1.9; margin-bottom: 32px; }
+  #startScreen .controls b { color: #00e5ff; }
+  #startScreen .start { background: #00e676; color: #000; border: none; padding: 16px 48px; font-size: 14px; letter-spacing: 4px; font-weight: bold; cursor: pointer; border-radius: 3px; font-family: inherit; }
+  #startScreen .start:hover { background: #00ff80; }
+  #endScreen { position: fixed; inset: 0; background: rgba(0, 5, 12, 0.95); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 100; padding: 20px; text-align: center; }
+  #endScreen.show { display: flex; }
+  #endScreen h1 { color: #00e676; font-size: 36px; letter-spacing: 8px; margin-bottom: 8px; }
+  #endScreen.lost h1 { color: #ff3d3d; }
+  #endScreen p { color: #c8d4e0; font-size: 13px; margin-bottom: 24px; }
+  #endScreen .stat { color: #00e5ff; font-size: 24px; margin: 8px 0; }
+  #endScreen .start { background: #00e5ff; color: #000; border: none; padding: 14px 40px; font-size: 13px; letter-spacing: 3px; font-weight: bold; cursor: pointer; border-radius: 3px; font-family: inherit; margin-top: 16px; }
+  /* virtual joystick */
+  #joystick { position: fixed; bottom: 30px; left: 30px; width: 120px; height: 120px; border-radius: 50%; background: rgba(0, 229, 255, 0.1); border: 2px solid rgba(0, 229, 255, 0.4); display: none; z-index: 20; }
+  #joystick .knob { position: absolute; width: 50px; height: 50px; border-radius: 50%; background: rgba(0, 229, 255, 0.5); border: 2px solid #00e5ff; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; }
+  @media (max-width: 900px), (hover: none) { #joystick { display: block; } }
+  /* fire button */
+  #fireBtn { position: fixed; bottom: 40px; right: 40px; width: 100px; height: 100px; border-radius: 50%; background: rgba(255, 60, 60, 0.2); border: 3px solid #ff3d3d; color: #ff8080; font-size: 14px; font-weight: bold; letter-spacing: 2px; display: none; z-index: 20; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; font-family: inherit; }
+  #fireBtn:active { background: #ff3d3d; color: #000; }
+  @media (max-width: 900px), (hover: none) { #fireBtn { display: flex; } }
+  /* ping button */
+  #pingBtn { position: fixed; bottom: 160px; right: 55px; width: 60px; height: 60px; border-radius: 50%; background: rgba(0, 229, 255, 0.2); border: 2px solid #00e5ff; color: #00e5ff; font-size: 10px; font-weight: bold; letter-spacing: 1px; display: none; z-index: 20; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; font-family: inherit; }
+  #pingBtn:active { background: #00e5ff; color: #000; }
+  @media (max-width: 900px), (hover: none) { #pingBtn { display: flex; } }
 </style>
 </head>
 <body>
+<canvas id="cv"></canvas>
 
-<div id="app">
-  <div id="topbar">
-    <div class="tb"><span class="l">SPD</span><span class="v" id="v-spd">5</span><span class="l">kt</span></div>
-    <div class="tb"><span class="l">HDG</span><span class="v" id="v-hdg">000</span><span class="l">°</span></div>
-    <div class="tb"><span class="l">DEP</span><span class="v" id="v-dep">200</span><span class="l">m</span></div>
-    <div class="tb"><span class="l">HULL</span><span class="v" id="v-hull">100</span><span class="l">%</span></div>
-    <div class="tb" style="margin-left:auto"><span class="l">SIG</span><span class="v" id="sig-val">LOW</span></div>
-    <div class="tb"><span class="l">SCORE</span><span class="v" id="v-score">0</span></div>
+<div id="ui">
+  <div id="minimap"></div>
+  <div class="hud" id="topLeft">
+    <div class="row"><span class="l">TETHYS</span></div>
+    <div class="row"><span class="l">Hull</span><span class="v" id="hudHull">100</span></div>
+    <div class="bar"><div class="fill fill-hp" id="hudHullBar" style="width:100%"></div></div>
+    <div class="row"><span class="l">Speed</span><span class="v" id="hudSpeed">5</span><span class="l">kt</span></div>
+    <div class="row"><span class="l">Depth</span><span class="v" id="hudDepth">200</span><span class="l">m</span></div>
   </div>
-
-  <div id="map">
-    <canvas id="cv"></canvas>
-    <div id="hint">WASD/ARROWS to move • MOUSE on map to turn • click ACTIONS to fire systems</div>
-    <canvas id="minimap" width="160" height="160"></canvas>
-    <div id="dpad">
-      <div class="dpad-btn dpad-up" data-key="w">▲</div>
-      <div class="dpad-btn dpad-down" data-key="s">▼</div>
-      <div class="dpad-btn dpad-left" data-key="a">◀</div>
-      <div class="dpad-btn dpad-right" data-key="d">▶</div>
-    </div>
+  <div class="hud" id="topRight">
+    <div class="row"><span class="l">Wave</span><span class="v" id="hudWave">1</span></div>
+    <div class="row"><span class="l">Contacts</span><span class="v" id="hudContacts">0</span></div>
+    <div class="row"><span class="l">Kills</span><span class="v" id="hudKills">0</span></div>
+    <div class="row"><span class="l">Score</span><span class="v" id="hudScore">0</span></div>
   </div>
-
-  <div id="panel">
-    <div class="section">
-      <h3>Contacts</h3>
-      <div id="contact-list"></div>
-    </div>
-    <div class="section" id="selected-section" style="display:none">
-      <h3>Selected: <span id="sel-id"></span></h3>
-      <div class="stat-line"><span class="l">Bearing</span><span class="v" id="sel-brg">—</span></div>
-      <div class="stat-line"><span class="l">Range</span><span class="v" id="sel-rng">—</span></div>
-      <div class="stat-line"><span class="l">Classification</span><span class="v" id="sel-cls">—</span></div>
-      <div class="stat-line"><span class="l">Speed</span><span class="v" id="sel-spd">—</span></div>
-      <div class="stat-line"><span class="l">Confidence</span><span class="v" id="sel-conf">—</span></div>
-      <h3 style="margin-top:8px">Engagement</h3>
-      <div class="prob-stack">
-        <div class="prob-row"><span class="lbl">Hit %</span><div class="bar"><div class="b fill-cyan" id="p-hit"></div></div><span class="pct" id="p-hit-v">0%</span></div>
-        <div class="prob-row"><span class="lbl">They Hit</span><div class="bar"><div class="b fill-red" id="p-they"></div></div><span class="pct" id="p-they-v">0%</span></div>
-        <div class="prob-row"><span class="lbl">Detect Us</span><div class="bar"><div class="b fill-amber" id="p-det"></div></div><span class="pct" id="p-det-v">0%</span></div>
-        <div class="prob-row"><span class="lbl">Decoy OK</span><div class="bar"><div class="b fill-green" id="p-dec"></div></div><span class="pct" id="p-dec-v">0%</span></div>
-      </div>
-    </div>
-    <div class="section">
-      <h3>Ship Status</h3>
-      <div class="stat-line"><span class="l">Speed</span><span class="v" id="st-spd">5 kt</span></div>
-      <div class="gauge"><div class="fill fill-cyan" id="st-spd-bar" style="width:25%"></div></div>
-      <div class="stat-line"><span class="l">Hull</span><span class="v" id="st-hull">100%</span></div>
-      <div class="gauge"><div class="fill fill-green" id="st-hull-bar" style="width:100%"></div></div>
-      <div class="stat-line"><span class="l">Sonar</span><span class="v" id="st-sonar">100%</span></div>
-      <div class="gauge"><div class="fill fill-cyan" id="st-sonar-bar" style="width:100%"></div></div>
-      <div class="stat-line"><span class="l">Tube 1</span><span class="v" id="st-t1">LOADED</span></div>
-      <div class="stat-line"><span class="l">Tube 2</span><span class="v" id="st-t2">LOADED</span></div>
-      <div class="stat-line"><span class="l">Decoys</span><span class="v" id="st-dec">4</span></div>
+  <div class="hud" id="botLeft">
+    <div class="controls-hint">
+      <span class="key">W A S D</span> move &nbsp;
+      <span class="key">MOUSE</span> aim &nbsp;
+      <span class="key">CLICK</span> fire torpedo<br>
+      <span class="key">Q E</span> depth &nbsp;
+      <span class="key">SPACE</span> active ping &nbsp;
+      <span class="key">R</span> decoy
     </div>
   </div>
-
-  <div id="controls">
-    <div class="ctrl-group">
-      <span class="label">SPD</span>
-      <button data-act="spd-down">−</button>
-      <button data-act="spd-up">+</button>
-    </div>
-    <div class="ctrl-group">
-      <span class="label">DEPTH</span>
-      <button data-act="dep-up">▲</button>
-      <button data-act="dep-down">▼</button>
-    </div>
-    <div class="ctrl-group">
-      <button class="primary" data-act="ping">PING</button>
-      <button class="danger" data-act="fire">FIRE T1</button>
-      <button class="warn" data-act="decoy">DECOY</button>
-    </div>
-    <div class="ctrl-group">
-      <button data-act="t1">T1</button>
-      <button data-act="t2">T2</button>
-    </div>
+  <div class="hud" id="botRight">
+    <div class="row"><span class="l">Reload</span><span class="v" id="hudReload">READY</span></div>
+    <div class="row"><span class="l">Decoys</span><span class="v" id="hudDecoys">3</span></div>
   </div>
+  <div id="wave">WAVE 1</div>
+  <div id="waveSub">3 contacts inbound</div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div id="joystick"><div class="knob" id="joyKnob"></div></div>
+<button id="fireBtn">FIRE</button>
+<button id="pingBtn">PING</button>
 
-<div id="overlay">
-  <h1 id="ov-title">ECHO PROTOCOL</h1>
-  <h2 id="ov-sub">TACTICAL SUBMARINE COMBAT — 2047</h2>
-  <div class="brief" id="ov-brief">
-    Year 2047. The Benthic Cold War has gone hot in the Arctic Trench.
-    Coalition and Sino-Pacific forces are fighting a silent war beneath the ice.
-    You command <b>USS TETHYS</b>, a stealth attack submarine on patrol in hostile waters.
-    Find the enemy. Read the ocean. Fire carefully. Survive.
+<div id="startScreen">
+  <h1>ECHO</h1>
+  <h2>PROTOCOL</h2>
+  <div class="brief">
+    <b>2047. The Arctic Trench.</b><br><br>
+    You command the <b>USS TETHYS</b>, a stealth attack submarine.
+    Enemy subs are patrolling the deep — find them, hunt them, survive.
+    Wave after wave they come. The trench keeps no prisoners.
   </div>
-  <div class="controls-list" id="ov-controls">
-    <b>MOVE</b> WASD or Arrow keys (or on-screen D-PAD on mobile)<br>
-    <b>TURN</b> Mouse position over the map (heading follows cursor)<br>
-    <b>PING</b> Active sonar — reveals contacts but reveals YOU to them<br>
-    <b>FIRE</b> Fires loaded torpedo at selected target (lead the target!)<br>
-    <b>DECOY</b> Drops a noise maker — draws torpedo attention<br>
-    <b>SPD / DEPTH</b> Faster = louder. Deeper = safer from ASW but more pressure risk<br>
-    <b>SELECT</b> Click a contact in the right panel to make it your target
+  <div class="controls">
+    <b>MOUSE</b> aim — your heading follows the cursor<br>
+    <b>LEFT CLICK</b> fire torpedo in aim direction<br>
+    <b>W A S D</b> or ARROW keys — move<br>
+    <b>Q E</b> change depth &nbsp;
+    <b>SPACE</b> active ping (reveals all contacts, but reveals you too)<br>
+    <b>R</b> deploy decoy (draws torpedo attention)
   </div>
-  <button class="start-btn" id="start-btn">BEGIN PATROL</button>
-  <div class="mission-info" id="ov-mission">MISSION 1: INTERCEPT</div>
+  <button class="start" id="startBtn">DIVE</button>
+</div>
+
+<div id="endScreen">
+  <h1 id="endTitle">MISSION COMPLETE</h1>
+  <p id="endSub">TETHYS returns to base</p>
+  <div class="stat" id="endScore">Score: 0</div>
+  <div class="stat" id="endWaves">Waves cleared: 0</div>
+  <button class="start" id="restartBtn">DIVE AGAIN</button>
 </div>
 
 <script>
-// ============================================================================
-// ECHO PROTOCOL — tactical submarine combat
-// ============================================================================
 'use strict';
 
-// ----------------------------------------------------------------------------
-// AUDIO — Web Audio synthesized
-// ----------------------------------------------------------------------------
+// ============================================================================
+// ECHO PROTOCOL — top-down submarine action
+// Diablo 4 camera + Sea of Thieves submarines
+// ============================================================================
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const minimap = document.getElementById('minimap');
+const minimapCtx = minimap.getContext('2d');
+
+const WORLD = 12000;  // big map
+const HALF = WORLD / 2;
+
+// ============================================================================
+// AUDIO
+// ============================================================================
 const Audio = (() => {
   let ctx = null;
-  let masterGain = null;
-  let ambientNode = null;
-  let ambientGain = null;
-  let pingOsc = null;
-  let pingGain = null;
-
   function init() {
     if (ctx) return;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = ctx.createGain();
-    masterGain.gain.value = 0.5;
-    masterGain.connect(ctx.destination);
     startAmbient();
   }
-
   function startAmbient() {
-    if (!ctx || ambientNode) return;
-    // Brown noise for deep ocean
     const bufSize = 2 * ctx.sampleRate;
     const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
-    const data = buf.getChannelData(0);
-    let lastOut = 0;
+    const d = buf.getChannelData(0);
+    let last = 0;
     for (let i = 0; i < bufSize; i++) {
-      const white = Math.random() * 2 - 1;
-      lastOut = (lastOut + 0.02 * white) / 1.02;
-      data[i] = lastOut * 3.5;
+      const w = Math.random() * 2 - 1;
+      last = (last + 0.02 * w) / 1.02;
+      d[i] = last * 4;
     }
-    ambientNode = ctx.createBufferSource();
-    ambientNode.buffer = buf;
-    ambientNode.loop = true;
-    ambientGain = ctx.createGain();
-    ambientGain.gain.value = 0.18;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 200;
-    ambientNode.connect(filter);
-    filter.connect(ambientGain);
-    ambientGain.connect(masterGain);
-    ambientNode.start();
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass'; f.frequency.value = 250;
+    const g = ctx.createGain(); g.gain.value = 0.15;
+    src.connect(f); f.connect(g); g.connect(ctx.destination);
+    src.start();
   }
-
-  function setAmbientVolume(v) {
-    if (ambientGain) ambientGain.gain.setTargetAtTime(v, ctx.currentTime, 0.1);
-  }
-
-  function ping(strength = 1) {
+  function ping() {
     if (!ctx) return;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.setValueAtTime(1200, t);
-    o.frequency.exponentialRampToValueAtTime(400, t + 0.6);
+    o.frequency.setValueAtTime(1400, t);
+    o.frequency.exponentialRampToValueAtTime(300, t + 0.8);
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.4 * strength, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.8);
-    o.connect(g);
-    g.connect(masterGain);
-    o.start(t);
-    o.stop(t + 0.9);
+    g.gain.linearRampToValueAtTime(0.4, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 1);
   }
-
-  function torpedo() {
+  function torpedo(stealth = false) {
     if (!ctx) return;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(80, t);
-    o.frequency.linearRampToValueAtTime(180, t + 0.2);
-    o.frequency.linearRampToValueAtTime(60, t + 1.5);
+    o.frequency.setValueAtTime(stealth ? 60 : 100, t);
+    o.frequency.linearRampToValueAtTime(stealth ? 100 : 180, t + 0.15);
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.15, t + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 1.5);
-    o.connect(g);
-    g.connect(masterGain);
-    o.start(t);
-    o.stop(t + 1.6);
+    g.gain.linearRampToValueAtTime(stealth ? 0.08 : 0.15, t + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 1.3);
   }
-
   function explosion() {
     if (!ctx) return;
     const t = ctx.currentTime;
-    // Noise burst
-    const bufSize = ctx.sampleRate * 0.8;
+    const bufSize = ctx.sampleRate * 0.7;
     const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
     const d = buf.getChannelData(0);
-    for (let i = 0; i < bufSize; i++) {
-      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2);
-    }
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    const g = ctx.createGain();
-    g.gain.value = 0.7;
-    const f = ctx.createBiquadFilter();
-    f.type = 'lowpass';
-    f.frequency.setValueAtTime(800, t);
-    f.frequency.exponentialRampToValueAtTime(60, t + 0.7);
-    src.connect(f);
-    f.connect(g);
-    g.connect(masterGain);
+    for (let i = 0; i < bufSize; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 1.5);
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass';
+    f.frequency.setValueAtTime(900, t);
+    f.frequency.exponentialRampToValueAtTime(50, t + 0.6);
+    const g = ctx.createGain(); g.gain.value = 0.6;
+    src.connect(f); f.connect(g); g.connect(ctx.destination);
     src.start(t);
   }
-
   function hit() {
     if (!ctx) return;
     const t = ctx.currentTime;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.type = 'square';
-    o.frequency.setValueAtTime(60, t);
+    o.frequency.setValueAtTime(80, t);
     o.frequency.exponentialRampToValueAtTime(20, t + 0.3);
-    g.gain.setValueAtTime(0.4, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
-    o.connect(g);
-    g.connect(masterGain);
-    o.start(t);
-    o.stop(t + 0.5);
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + 0.5);
   }
-
-  function blip(type = 'contact') {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = type === 'enemy' ? 800 : 600;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.15, t + 0.005);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-    o.connect(g);
-    g.connect(masterGain);
-    o.start(t);
-    o.stop(t + 0.15);
-  }
-
-  function decoy() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sawtooth';
-    o.frequency.value = 200;
-    const lfo = ctx.createOscillator();
-    const lfoG = ctx.createGain();
-    lfo.frequency.value = 4;
-    lfoG.gain.value = 50;
-    lfo.connect(lfoG);
-    lfoG.connect(o.frequency);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.12, t + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 3);
-    o.connect(g);
-    g.connect(masterGain);
-    o.start(t);
-    o.stop(t + 3.1);
-    lfo.start(t);
-    lfo.stop(t + 3.1);
-  }
-
   function warning() {
     if (!ctx) return;
     const t = ctx.currentTime;
     for (let i = 0; i < 3; i++) {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
-      o.type = 'square';
       o.frequency.value = 880;
-      g.gain.setValueAtTime(0, t + i * 0.18);
-      g.gain.linearRampToValueAtTime(0.18, t + i * 0.18 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.18 + 0.12);
-      o.connect(g);
-      g.connect(masterGain);
-      o.start(t + i * 0.18);
-      o.stop(t + i * 0.18 + 0.15);
+      g.gain.setValueAtTime(0, t + i * 0.15);
+      g.gain.linearRampToValueAtTime(0.15, t + i * 0.15 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.15 + 0.1);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(t + i * 0.15); o.stop(t + i * 0.15 + 0.13);
     }
   }
-
-  return { init, ping, torpedo, explosion, hit, blip, decoy, warning, setAmbientVolume };
+  return { init, ping, torpedo, explosion, hit, warning };
 })();
 
-// ----------------------------------------------------------------------------
-// GAME STATE
-// ----------------------------------------------------------------------------
-const WORLD = 4000;        // world size in meters
-const THERMAL_TOP = 180;
-const THERMAL_BOT = 320;
-const CRUSH_DEPTH = 450;
-
+// ============================================================================
+// STATE
+// ============================================================================
 const state = {
-  mode: 'menu',           // 'menu', 'play', 'win', 'lose'
-  mission: 0,
-  score: 0,
-  player: {
-    x: 0, y: 0,           // world coords (m)
-    heading: 0,           // degrees, 0 = north
-    speed: 5,             // knots
-    desiredSpeed: 5,
-    depth: 200,
-    desiredDepth: 200,
-    hull: 100,
-    sonar: 100,
-    tubes: ['MK48', 'MK48'],
-    decoys: 4,
-    lastPingT: -10,
-    targetId: null,       // selected enemy id
-    turning: 0,           // -1, 0, 1
-  },
-  enemies: [],
-  torpedoes: [],          // {x,y,heading,owner,targetId,age}
-  wakeTrails: [],
-  bubbles: [],
-  particles: [],
-  popups: [],
-  contacts: [],           // detected contacts (subset of enemies)
-  nextId: 1,
-  camX: 0, camY: 0,
-  zoom: 0.18,             // pixels per meter
-  keys: {},
-  mouse: { x: 0, y: 0, onMap: false, leftDown: false },
+  mode: 'menu',       // 'menu', 'play', 'dead', 'won'
   time: 0,
-  lastTime: 0,
-  dt: 0,
-  missionTime: 0,
-  gameOverReason: '',
-  // mission state
+  wave: 1,
+  score: 0,
   kills: 0,
-  killsNeeded: 0,
-  missionName: '',
+  shake: 0,
+  mouseX: 0, mouseY: 0,
+  mouseDown: false,
+  camX: 0, camY: 0,
+  camZoom: 0.55,     // pixels per meter (will tune)
+  player: null,
+  enemies: [],
+  torpedoes: [],
+  particles: [],
+  bubbles: [],
+  decoys: [],
+  selectedTarget: null,
+  waveSpawned: 0,
+  waveKilled: 0,
 };
 
-// ----------------------------------------------------------------------------
-// CANVAS / RENDER
-// ----------------------------------------------------------------------------
-const cv = document.getElementById('cv');
-const ctx = cv.getContext('2d');
-const minimapCv = document.getElementById('minimap');
-const minimapCtx = minimapCv.getContext('2d');
-
-function resize() {
-  const map = document.getElementById('map');
-  const dpr = window.devicePixelRatio || 1;
-  cv.width = map.clientWidth * dpr;
-  cv.height = map.clientHeight * dpr;
-  cv.style.width = map.clientWidth + 'px';
-  cv.style.height = map.clientHeight + 'px';
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+// ============================================================================
+// PLAYER
+// ============================================================================
+function makePlayer() {
+  return {
+    x: 0, y: 0,
+    heading: 0,
+    targetHeading: 0,
+    speed: 6,         // current speed (kt)
+    desiredSpeed: 6,  // commanded speed
+    depth: 200,
+    targetDepth: 200,
+    hull: 100,
+    tubes: 2,         // torpedoes remaining in this wave
+    cooldown: 0,      // reload timer
+    decoys: 3,
+    lastPingT: -10,
+    burst: 0,         // burst speed timer
+    invuln: 0,
+  };
 }
-window.addEventListener('resize', resize);
+
+// ============================================================================
+// ENEMIES
+// ============================================================================
+function makeEnemy(type, x, y) {
+  const base = {
+    type, x, y,
+    heading: Math.random() * 360,
+    speed: 4 + Math.random() * 3,
+    desiredSpeed: 5,
+    depth: 150 + Math.random() * 200,
+    targetDepth: 200,
+    hull: 60,
+    maxHull: 60,
+    cooldown: 0,
+    aiState: 'patrol',
+    aiT: 0,
+    target: null,
+    sawPlayer: false,
+    awareness: 0,
+    burst: 0,
+    patrolAngle: Math.random() * Math.PI * 2,
+    patrolRadius: 500 + Math.random() * 500,
+    patrolCx: x,
+    patrolCy: y,
+  };
+  if (type === 'hunter') {
+    base.hull = base.maxHull = 90;
+    base.speed = 7;
+    base.desiredSpeed = 7;
+  } else if (type === 'ace') {
+    base.hull = base.maxHull = 130;
+    base.speed = 6;
+    base.desiredSpeed = 6;
+  } else if (type === 'swarm') {
+    base.hull = base.maxHull = 30;
+    base.speed = 9;
+    base.desiredSpeed = 9;
+  }
+  return base;
+}
+
+// ============================================================================
+// CAMERA
+// ============================================================================
+function updateCamera() {
+  const p = state.player;
+  if (!p) return;
+  state.camX += (p.x - state.camX) * 0.08;
+  state.camY += (p.y - state.camY) * 0.08;
+}
 
 function worldToScreen(wx, wy) {
-  const map = document.getElementById('map');
   return {
-    x: map.clientWidth / 2 + (wx - state.camX) * state.zoom,
-    y: map.clientHeight / 2 + (wy - state.camY) * state.zoom,
+    x: window.innerWidth / 2 + (wx - state.camX) * state.camZoom,
+    y: window.innerHeight / 2 + (wy - state.camY) * state.camZoom,
   };
 }
-
 function screenToWorld(sx, sy) {
-  const map = document.getElementById('map');
   return {
-    x: state.camX + (sx - map.clientWidth / 2) / state.zoom,
-    y: state.camY + (sy - map.clientHeight / 2) / state.zoom,
+    x: state.camX + (sx - window.innerWidth / 2) / state.camZoom,
+    y: state.camY + (sy - window.innerHeight / 2) / state.camZoom,
   };
 }
 
-// ----------------------------------------------------------------------------
-// TERRAIN (static for prototype)
-// ----------------------------------------------------------------------------
-const terrain = { reefs: [], vents: [], wrecks: [] };
-
-function generateTerrain() {
-  terrain.reefs = [];
-  terrain.vents = [];
-  terrain.wrecks = [];
-  // a few reefs
-  for (let i = 0; i < 6; i++) {
-    const cx = (Math.random() - 0.5) * WORLD;
-    const cy = (Math.random() - 0.5) * WORLD;
-    const r = 200 + Math.random() * 300;
-    terrain.reefs.push({ x: cx, y: cy, r });
+// ============================================================================
+// WAVE SPAWNING
+// ============================================================================
+function startWave(n) {
+  state.wave = n;
+  state.waveSpawned = 0;
+  state.waveKilled = 0;
+  // count to spawn: wave 1 = 3, then +1 per wave, cap 12
+  const count = Math.min(12, 2 + n);
+  const spawnPoints = 6;
+  const types = ['patrol', 'patrol', 'hunter', 'swarm', 'ace'];
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.5;
+    const r = 4500 + Math.random() * 1500;
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r;
+    // type weights: more hunters/ace in later waves
+    let type = 'patrol';
+    const r2 = Math.random();
+    if (n >= 2 && r2 < 0.25) type = 'hunter';
+    else if (n >= 3 && r2 < 0.35) type = 'ace';
+    else if (n >= 4 && r2 < 0.55) type = 'swarm';
+    state.enemies.push(makeEnemy(type, x, y));
+    state.waveSpawned++;
   }
-  // thermal vents
-  for (let i = 0; i < 4; i++) {
-    terrain.vents.push({
-      x: (Math.random() - 0.5) * WORLD,
-      y: (Math.random() - 0.5) * WORLD,
-      r: 100 + Math.random() * 150,
+  showWave(n, count);
+}
+
+function showWave(n, count) {
+  const w = document.getElementById('wave');
+  const s = document.getElementById('waveSub');
+  w.textContent = `WAVE ${n}`;
+  s.textContent = `${count} contacts inbound`;
+  w.classList.add('show');
+  s.classList.add('show');
+  setTimeout(() => { w.classList.remove('show'); s.classList.remove('show'); }, 2500);
+}
+
+function checkWaveEnd() {
+  if (state.mode !== 'play') return;
+  const alive = state.enemies.filter(e => e.hull > 0).length;
+  if (alive === 0) {
+    // next wave after a brief delay
+    setTimeout(() => {
+      if (state.mode === 'play') startWave(state.wave + 1);
+    }, 2000);
+  }
+}
+
+// ============================================================================
+// INPUT
+// ============================================================================
+const keys = {};
+let joystickVec = { x: 0, y: 0 };
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (e.repeat) return;
+  keys[k] = true;
+  if (k === ' ') { e.preventDefault(); doPing(); }
+  if (k === 'r') doDecoy();
+  if (k === 'q') { state.player.targetDepth = Math.max(50, state.player.targetDepth - 40); }
+  if (k === 'e') { state.player.targetDepth = Math.min(500, state.player.targetDepth + 40); }
+  if (k === 'shift') { state.player.burst = 2; }  // burst sprint
+});
+window.addEventListener('keyup', e => {
+  const k = e.key.toLowerCase();
+  keys[k] = false;
+  if (k === 'shift') state.player.burst = 0;
+});
+
+window.addEventListener('mousemove', e => {
+  state.mouseX = e.clientX;
+  state.mouseY = e.clientY;
+});
+window.addEventListener('mousedown', e => {
+  if (e.button === 0) {
+    state.mouseDown = true;
+    tryFire();
+  }
+});
+window.addEventListener('mouseup', e => {
+  if (e.button === 0) state.mouseDown = false;
+});
+window.addEventListener('contextmenu', e => e.preventDefault());
+
+// touch — single-finger move (or virtual joystick), two-finger aim+fire
+let touchAim = null;  // finger id for aim
+let touchMove = null; // finger id for movement (joystick on mobile)
+window.addEventListener('touchstart', e => {
+  for (const t of e.changedTouches) {
+    if (t.clientX < window.innerWidth * 0.5 && touchMove === null) {
+      touchMove = t.identifier;
+      joystickVec = joystickStart(t);
+    } else if (touchAim === null) {
+      touchAim = t.identifier;
+      state.mouseX = t.clientX;
+      state.mouseY = t.clientY;
+    }
+  }
+}, { passive: false });
+window.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchMove) joystickUpdate(t);
+    if (t.identifier === touchAim) {
+      state.mouseX = t.clientX;
+      state.mouseY = t.clientY;
+    }
+  }
+}, { passive: false });
+window.addEventListener('touchend', e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === touchMove) {
+      touchMove = null;
+      joystickVec = { x: 0, y: 0 };
+    }
+    if (t.identifier === touchAim) touchAim = null;
+  }
+});
+
+// Virtual joystick logic
+const joystickEl = document.getElementById('joystick');
+const joyKnob = document.getElementById('joyKnob');
+let joystickOrigin = { x: 0, y: 0 };
+let joystickActive = false;
+
+function joystickStart(t) {
+  joystickOrigin = { x: t.clientX, y: t.clientY };
+  joystickEl.style.left = (t.clientX - 60) + 'px';
+  joystickEl.style.top = (t.clientY - 60) + 'px';
+  joystickEl.style.display = 'block';
+  joyKnob.style.transform = 'translate(-50%, -50%)';
+  joystickActive = true;
+  return { x: 0, y: 0 };
+}
+function joystickUpdate(t) {
+  if (!joystickActive) return;
+  const dx = t.clientX - joystickOrigin.x;
+  const dy = t.clientY - joystickOrigin.y;
+  const d = Math.hypot(dx, dy);
+  const max = 50;
+  const cx = Math.max(-max, Math.min(max, dx));
+  const cy = Math.max(-max, Math.min(max, dy));
+  joyKnob.style.transform = `translate(calc(-50% + ${cx}px), calc(-50% + ${cy}px))`;
+  joystickVec = { x: cx / max, y: cy / max };
+}
+// desktop: ignore touch
+if (!('ontouchstart' in window)) {
+  joystickEl.style.display = 'none';
+}
+
+// fire button (mobile)
+document.getElementById('fireBtn').addEventListener('touchstart', e => {
+  e.preventDefault();
+  tryFire();
+});
+document.getElementById('pingBtn').addEventListener('touchstart', e => {
+  e.preventDefault();
+  doPing();
+});
+
+// ============================================================================
+// ACTIONS
+// ============================================================================
+let lastFireT = 0;
+function tryFire() {
+  if (state.mode !== 'play' || !state.player) return;
+  const p = state.player;
+  if (state.time - lastFireT < 0.5) return;
+  if (p.tubes <= 0) return;
+  if (p.cooldown > 0) return;
+  lastFireT = state.time;
+  p.tubes--;
+  p.cooldown = 2.5;  // 2.5s reload
+  Audio.torpedo();
+  // fire from sub bow toward aim point (or toward target)
+  let aimX, aimY;
+  const target = state.selectedTarget ? state.enemies.find(e => e.id === state.selectedTarget) : null;
+  if (target) {
+    // lead the target
+    const lead = Math.hypot(target.x - p.x, target.y - p.y) / 25;
+    aimX = target.x + Math.sin(target.heading * Math.PI / 180) * lead * target.speed * 0.5;
+    aimY = target.y + Math.cos(target.heading * Math.PI / 180) * lead * target.speed * 0.5;
+  } else {
+    const w = screenToWorld(state.mouseX, state.mouseY);
+    aimX = w.x; aimY = w.y;
+  }
+  const heading = Math.atan2(aimX - p.x, aimY - p.y) * 180 / Math.PI;
+  const bowOffset = 18;
+  state.torpedoes.push({
+    x: p.x + Math.sin(heading * Math.PI / 180) * bowOffset,
+    y: p.y + Math.cos(heading * Math.PI / 180) * bowOffset,
+    heading,
+    speed: 32,
+    owner: 'player',
+    target: target,  // may be null
+    life: 8,
+    age: 0,
+    bubbles: 0,
+  });
+  // muzzle flash particles
+  for (let i = 0; i < 8; i++) {
+    const a = (heading + (Math.random() - 0.5) * 30) * Math.PI / 180;
+    state.particles.push({
+      x: p.x + Math.sin(heading * Math.PI / 180) * 20,
+      y: p.y + Math.cos(heading * Math.PI / 180) * 20,
+      vx: Math.sin(a) * 60,
+      vy: Math.cos(a) * 60,
+      life: 0.5, maxLife: 0.5, color: '#00e5ff', type: 'spark', size: 2 + Math.random() * 2,
     });
   }
+}
+
+function doPing() {
+  if (state.mode !== 'play' || !state.player) return;
+  if (state.time - state.player.lastPingT < 2) return;
+  state.player.lastPingT = state.time;
+  Audio.ping();
+  for (const e of state.enemies) {
+    if (e.hull <= 0) continue;
+    if (Math.hypot(e.x - state.player.x, e.y - state.player.y) < 5000) {
+      e.awareness = Math.min(1, e.awareness + 0.3);
+      e.sawPlayer = true;
+      e.target = { x: state.player.x, y: state.player.y };
+    }
+  }
+  // ping ring particles
+  for (let i = 0; i < 60; i++) {
+    const a = (i / 60) * Math.PI * 2;
+    state.particles.push({
+      x: state.player.x, y: state.player.y,
+      vx: Math.cos(a) * 100, vy: Math.sin(a) * 100,
+      life: 2, maxLife: 2, color: '#00e5ff', type: 'ring',
+    });
+  }
+}
+
+function doDecoy() {
+  if (state.mode !== 'play' || !state.player) return;
+  if (state.player.decoys <= 0) return;
+  state.player.decoys--;
+  const d = {
+    x: state.player.x, y: state.player.y,
+    heading: state.player.heading,
+    speed: 3,
+    life: 12,
+  };
+  state.decoys.push(d);
+  // torps targeting player will retarget
+  for (const t of state.torpedoes) {
+    if (t.owner === 'enemy' && Math.hypot(t.x - state.player.x, t.y - state.player.y) < 800) {
+      if (Math.random() < 0.7) t.target = d;
+    }
+  }
+}
+
+// ============================================================================
+// PLAYER UPDATE
+// ============================================================================
+function updatePlayer(dt) {
+  const p = state.player;
+  // speed: WASD
+  let speedInput = 0, turnInput = 0;
+  if (keys['w'] || keys['arrowup']) speedInput += 1;
+  if (keys['s'] || keys['arrowdown']) speedInput -= 1;
+  if (keys['a'] || keys['arrowleft']) turnInput -= 1;
+  if (keys['d'] || keys['arrowright']) turnInput += 1;
+  // joystick
+  if (joystickVec.x !== 0 || joystickVec.y !== 0) {
+    // joystick.y up = forward, but on screen y is inverted
+    // we want up on stick = forward
+    speedInput = -joystickVec.y;  // up = -y on screen
+    turnInput = joystickVec.x;
+  }
+  p.desiredSpeed = Math.max(0, Math.min(p.burst > 0 ? 18 : 11, p.desiredSpeed + speedInput * 4 * dt));
+  p.speed += (p.desiredSpeed - p.speed) * Math.min(1, 2.5 * dt);
+
+  // heading toward mouse if no turn key held
+  if (Math.abs(turnInput) < 0.01) {
+    const w = screenToWorld(state.mouseX, state.mouseY);
+    const targetH = Math.atan2(w.x - p.x, w.y - p.y) * 180 / Math.PI;
+    const delta = ((targetH - p.heading + 540) % 360) - 180;
+    p.heading += Math.sign(delta) * Math.min(Math.abs(delta), 90 * dt);
+  } else {
+    p.heading += turnInput * 120 * dt;
+  }
+  p.heading = (p.heading + 360) % 360;
+
+  // burst tick
+  if (p.burst > 0) {
+    p.burst -= dt;
+    p.hull -= dt * 1;  // self-damage
+    if (p.hull <= 0) killPlayer();
+  }
+
+  // depth
+  p.depth += (p.targetDepth - p.depth) * Math.min(1, 1.5 * dt);
+
+  // move
+  const spd = p.speed * 0.8;  // pixels worth per second (visual)
+  p.x += Math.sin(p.heading * Math.PI / 180) * spd * dt;
+  p.y += Math.cos(p.heading * Math.PI / 180) * spd * dt;
+  // clamp to world (with soft bounce)
+  const margin = 200;
+  if (p.x < -HALF + margin) p.x = -HALF + margin;
+  if (p.x > HALF - margin) p.x = HALF - margin;
+  if (p.y < -HALF + margin) p.y = -HALF + margin;
+  if (p.y > HALF - margin) p.y = HALF - margin;
+
+  // reload
+  if (p.cooldown > 0) p.cooldown -= dt;
+  if (p.invuln > 0) p.invuln -= dt;
+}
+
+function killPlayer() {
+  if (state.mode !== 'play') return;
+  state.mode = 'dead';
+  // big explosion
+  for (let i = 0; i < 100; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 50 + Math.random() * 200;
+    state.particles.push({
+      x: state.player.x, y: state.player.y,
+      vx: Math.sin(a) * sp, vy: Math.cos(a) * sp,
+      life: 3, maxLife: 3, color: '#ff3d3d', type: 'spark', size: 3 + Math.random() * 3,
+    });
+  }
+  Audio.explosion();
+  state.shake = 1.5;
+  setTimeout(() => {
+    document.getElementById('endScreen').classList.add('show');
+    document.getElementById('endScreen').classList.add('lost');
+    document.getElementById('endTitle').textContent = 'TETHYS LOST';
+    document.getElementById('endSub').textContent = 'Hull breach. All hands.';
+    document.getElementById('endScore').textContent = 'Score: ' + state.score;
+    document.getElementById('endWaves').textContent = 'Waves cleared: ' + (state.wave - 1);
+  }, 1500);
+}
+
+// ============================================================================
+// ENEMY AI
+// ============================================================================
+function updateEnemies(dt) {
+  const p = state.player;
+  for (const e of state.enemies) {
+    if (e.hull <= 0) continue;
+    e.aiT += dt;
+    if (e.cooldown > 0) e.cooldown -= dt;
+
+    const d = Math.hypot(p.x - e.x, p.y - e.y);
+    // awareness based on player speed/noise
+    const playerNoise = p.speed * 0.1;
+    const heard = playerNoise * 1000 / Math.max(100, d);
+    if (heard > 0.3) {
+      e.awareness = Math.min(1, e.awareness + heard * dt * 0.5);
+      if (e.awareness > 0.5) {
+        e.sawPlayer = true;
+        e.target = { x: p.x, y: p.y };
+      }
+    } else {
+      e.awareness = Math.max(0, e.awareness - dt * 0.2);
+    }
+
+    if (e.sawPlayer) {
+      e.aiState = 'attack';
+    } else {
+      e.aiState = 'patrol';
+    }
+
+    if (e.aiState === 'patrol') {
+      e.patrolAngle += dt * 0.2;
+      const tx = e.patrolCx + Math.cos(e.patrolAngle) * e.patrolRadius;
+      const ty = e.patrolCy + Math.sin(e.patrolAngle) * e.patrolRadius;
+      e.heading = Math.atan2(tx - e.x, ty - e.y) * 180 / Math.PI;
+      e.speed += (e.desiredSpeed - e.speed) * Math.min(1, 2 * dt);
+    } else {
+      // intercept
+      if (e.target) {
+        e.heading = Math.atan2(e.target.x - e.x, e.target.y - e.y) * 180 / Math.PI;
+      }
+      e.speed += ((e.burst > 0 ? e.desiredSpeed * 1.3 : e.desiredSpeed) - e.speed) * Math.min(1, 2.5 * dt);
+      if (d < 1200 && e.cooldown <= 0) {
+        eFireTorpedo(e, p);
+      }
+      // burst sprint
+      if (e.hull < e.maxHull * 0.3 && Math.random() < dt * 0.5) e.burst = 1.5;
+      if (e.burst > 0) e.burst -= dt;
+    }
+
+    // move
+    const spd = e.speed * 0.8;
+    e.x += Math.sin(e.heading * Math.PI / 180) * spd * dt;
+    e.y += Math.cos(e.heading * Math.PI / 180) * spd * dt;
+    e.x = Math.max(-HALF + 100, Math.min(HALF - 100, e.x));
+    e.y = Math.max(-HALF + 100, Math.min(HALF - 100, e.y));
+
+    // world boundary homing (don't go too far)
+    const distFromCenter = Math.hypot(e.x, e.y);
+    if (distFromCenter > 5500) {
+      e.heading = Math.atan2(-e.x, -e.y) * 180 / Math.PI;
+    }
+  }
+}
+
+function eFireTorpedo(e, p) {
+  e.cooldown = 3.5;
+  const heading = Math.atan2(p.x - e.x, p.y - e.y) * 180 / Math.PI;
+  // lead the player slightly
+  const lead = Math.hypot(p.x - e.x, p.y - e.y) / 30;
+  const tx = p.x + Math.sin(p.heading * Math.PI / 180) * lead * p.speed * 0.3;
+  const ty = p.y + Math.cos(p.heading * Math.PI / 180) * lead * p.speed * 0.3;
+  const h2 = Math.atan2(tx - e.x, ty - e.y) * 180 / Math.PI;
+  state.torpedoes.push({
+    x: e.x + Math.sin(h2 * Math.PI / 180) * 18,
+    y: e.y + Math.cos(h2 * Math.PI / 180) * 18,
+    heading: h2,
+    speed: 22,
+    owner: 'enemy',
+    target: p,
+    life: 10,
+    age: 0,
+  });
+  Audio.torpedo(true);
+  // alert if close
+  if (Math.hypot(p.x - e.x, p.y - e.y) < 2000) {
+    state.shake = Math.max(state.shake, 0.3);
+  }
+}
+
+// ============================================================================
+// TORPEDOES
+// ============================================================================
+function updateTorpedoes(dt) {
+  for (const t of state.torpedoes) {
+    t.age += dt;
+    // seek target
+    if (t.target) {
+      let tx, ty;
+      if (t.target === state.player) {
+        tx = t.target.x; ty = t.target.y;
+      } else if (t.target.hull !== undefined) {
+        if (t.target.hull <= 0) { t.target = null; continue; }
+        tx = t.target.x; ty = t.target.y;
+      } else {
+        // decoy
+        tx = t.target.x; ty = t.target.y;
+      }
+      const targetH = Math.atan2(tx - t.x, ty - t.y) * 180 / Math.PI;
+      const delta = ((targetH - t.heading + 540) % 360) - 180;
+      t.heading += Math.sign(delta) * Math.min(Math.abs(delta), 80 * dt);
+    }
+    t.x += Math.sin(t.heading * Math.PI / 180) * t.speed * dt;
+    t.y += Math.cos(t.heading * Math.PI / 180) * t.speed * dt;
+    // bubbles
+    if (Math.random() < 0.3) {
+      state.bubbles.push({
+        x: t.x - Math.sin(t.heading * Math.PI / 180) * 6,
+        y: t.y - Math.cos(t.heading * Math.PI / 180) * 6,
+        life: 1.5, maxLife: 1.5, size: 1 + Math.random() * 1.5,
+      });
+    }
+    // hit
+    if (t.owner === 'player') {
+      for (const e of state.enemies) {
+        if (e.hull <= 0) continue;
+        if (Math.hypot(e.x - t.x, e.y - t.y) < 22) {
+          e.hull -= 60 + Math.random() * 20;
+          t.life = 0;
+          explodeAt(t.x, t.y, 30, '#ff8800');
+          Audio.hit();
+          if (e.hull <= 0) {
+            state.kills++;
+            state.score += 100 + (e.type === 'ace' ? 500 : e.type === 'hunter' ? 200 : 50);
+            state.waveKilled++;
+            explodeAt(e.x, e.y, 80, '#ff3d3d');
+            state.shake = Math.max(state.shake, 0.6);
+            Audio.explosion();
+          }
+          break;
+        }
+      }
+    } else {
+      // enemy torp hit player
+      const p = state.player;
+      if (p && Math.hypot(p.x - t.x, p.y - t.y) < 24) {
+        if (p.invuln <= 0) {
+          p.hull -= 25 + Math.random() * 15;
+          p.invuln = 0.5;
+          t.life = 0;
+          explodeAt(t.x, t.y, 25, '#ff3d3d');
+          Audio.hit();
+          Audio.warning();
+          state.shake = Math.max(state.shake, 0.4);
+          if (p.hull <= 0) killPlayer();
+        }
+      }
+    }
+    // decoy hit
+    if (t.target && t.target.hull === undefined) {
+      // it's a decoy
+      for (const d of state.decoys) {
+        if (d === t.target && Math.hypot(d.x - t.x, d.y - t.y) < 18) {
+          t.life = 0;
+          explodeAt(t.x, t.y, 10, '#888');
+        }
+      }
+    }
+  }
+  state.torpedoes = state.torpedoes.filter(t => t.life - t.age > 0);
+}
+
+function explodeAt(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 30 + Math.random() * 150;
+    state.particles.push({
+      x, y, vx: Math.sin(a) * sp, vy: Math.cos(a) * sp,
+      life: 0.8 + Math.random() * 0.8, maxLife: 1.2,
+      color, type: 'spark', size: 2 + Math.random() * 3,
+    });
+  }
+  state.shake = Math.max(state.shake, count / 80);
+}
+
+// ============================================================================
+// PARTICLES & BUBBLES
+// ============================================================================
+function updateParticles(dt) {
+  for (const p of state.particles) {
+    p.life -= dt;
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vx *= 0.94;
+    p.vy *= 0.94;
+  }
+  state.particles = state.particles.filter(p => p.life > 0);
+  for (const b of state.bubbles) {
+    b.life -= dt;
+    b.x += (Math.random() - 0.5) * 4;
+    b.y -= 8 * dt;
+  }
+  state.bubbles = state.bubbles.filter(b => b.life > 0);
+  for (const d of state.decoys) {
+    d.life -= dt;
+    d.x += Math.sin(d.heading * Math.PI / 180) * d.speed * dt;
+    d.y += Math.cos(d.heading * Math.PI / 180) * d.speed * dt;
+  }
+  state.decoys = state.decoys.filter(d => d.life > 0);
+  if (state.shake > 0) state.shake = Math.max(0, state.shake - dt * 2);
+}
+
+// ============================================================================
+// RENDER
+// ============================================================================
+let frame = 0;
+function render() {
+  frame++;
+  const W = window.innerWidth, H = window.innerHeight;
+  // canvas size
+  if (cv.width !== W * window.devicePixelRatio || cv.height !== H * window.devicePixelRatio) {
+    cv.width = W * window.devicePixelRatio;
+    cv.height = H * window.devicePixelRatio;
+    cv.style.width = W + 'px';
+    cv.style.height = H + 'px';
+    ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  }
+  ctx.clearRect(0, 0, W, H);
+
+  // screen shake
+  const shake = state.shake * 14;
+  const sx = (Math.random() - 0.5) * shake;
+  const sy = (Math.random() - 0.5) * shake;
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  // Background: depth-based water color
+  renderWater(W, H);
+
+  // World border
+  renderWorldBorder();
+
+  // Terrain (rendered in world space)
+  renderTerrain();
+
+  // Decoys
+  for (const d of state.decoys) renderDecoy(d);
+
+  // Torpedoes (under subs)
+  for (const t of state.torpedoes) renderTorpedo(t);
+
+  // Enemies
+  for (const e of state.enemies) {
+    if (e.hull > 0) renderSub(e, false);
+  }
+
+  // Player
+  if (state.player && state.mode === 'play') renderSub(state.player, true);
+
+  // Bubbles
+  for (const b of state.bubbles) renderBubble(b);
+
+  // Particles
+  for (const p of state.particles) renderParticle(p);
+
+  // Mouse aim crosshair
+  renderCrosshair();
+
+  // Selected target reticle
+  renderTargetReticle();
+
+  ctx.restore();
+}
+
+function renderWater(W, H) {
+  // depth-based base color
+  const depth = state.player ? state.player.depth : 200;
+  const t = Math.max(0, Math.min(1, (depth - 50) / 450));
+  // shallow = lighter blue, deep = dark navy
+  const r = Math.floor(8 + (1 - t) * 20);
+  const g = Math.floor(40 + (1 - t) * 30);
+  const b = Math.floor(70 + (1 - t) * 30);
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(0, 0, W, H);
+
+  // Animated caustics: light rays through the water
+  const camWorldX = state.camX;
+  const camWorldY = state.camY;
+  ctx.save();
+  ctx.globalAlpha = 0.06;
+  for (let i = 0; i < 30; i++) {
+    const ox = (i * 700 + frame * 0.4) % (W + 400) - 200;
+    const oy = (i * 230 + Math.sin(frame * 0.01 + i) * 50) % H;
+    const w = 80 + (i % 4) * 40;
+    const grad = ctx.createLinearGradient(ox, oy, ox, oy + w);
+    grad.addColorStop(0, 'rgba(150, 220, 255, 0.5)');
+    grad.addColorStop(1, 'rgba(150, 220, 255, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + w, oy);
+    ctx.lineTo(ox + w - 30, oy + w);
+    ctx.lineTo(ox - 30, oy + w);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // subtle dark vignette toward edges
+  const vig = ctx.createRadialGradient(W/2, H/2, Math.min(W,H) * 0.3, W/2, H/2, Math.max(W,H) * 0.7);
+  vig.addColorStop(0, 'rgba(0,0,0,0)');
+  vig.addColorStop(1, 'rgba(0,5,15,0.5)');
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function renderWorldBorder() {
+  const c1 = worldToScreen(-HALF, -HALF);
+  const c2 = worldToScreen(HALF, HALF);
+  const w = c2.x - c1.x;
+  const h = c2.y - c1.y;
+  ctx.strokeStyle = 'rgba(255, 60, 60, 0.4)';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([10, 10]);
+  ctx.lineDashOffset = -frame * 0.3;
+  ctx.strokeRect(c1.x, c1.y, w, h);
+  ctx.setLineDash([]);
+}
+
+function renderTerrain() {
+  // Static terrain features (procedurally placed at start, but use noise for variety)
+  // For perf, only render what's on screen
+  const W = window.innerWidth, H = window.innerHeight;
+  const tl = screenToWorld(0, 0);
+  const br = screenToWorld(W, H);
+  // reefs
+  for (const r of terrain.reefs) {
+    if (r.x < tl.x - 500 || r.x > br.x + 500 || r.y < tl.y - 500 || r.y > br.y + 500) continue;
+    const s = worldToScreen(r.x, r.y);
+    const rad = r.r * state.camZoom;
+    ctx.fillStyle = 'rgba(40, 80, 60, 0.5)';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, rad, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100, 180, 140, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // coral spikes
+    ctx.fillStyle = 'rgba(60, 130, 90, 0.4)';
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const sx = s.x + Math.cos(a) * rad * 0.7;
+      const sy = s.y + Math.sin(a) * rad * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(sx - 4, sy);
+      ctx.lineTo(sx, sy - 12);
+      ctx.lineTo(sx + 4, sy);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
   // wrecks
-  for (let i = 0; i < 3; i++) {
+  for (const w of terrain.wrecks) {
+    if (w.x < tl.x - 500 || w.x > br.x + 500 || w.y < tl.y - 500 || w.y > br.y + 500) continue;
+    const s = worldToScreen(w.x, w.y);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(-w.heading * Math.PI / 180);
+    const len = w.length * state.camZoom;
+    ctx.fillStyle = 'rgba(70, 50, 40, 0.7)';
+    ctx.fillRect(-len/2, -8, len, 16);
+    ctx.strokeStyle = 'rgba(140, 100, 80, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-len/2, -8, len, 16);
+    ctx.restore();
+  }
+}
+
+// terrain generated once
+const terrain = { reefs: [], wrecks: [] };
+function generateTerrain() {
+  terrain.reefs = [];
+  terrain.wrecks = [];
+  const N = 80;
+  for (let i = 0; i < N; i++) {
+    const x = (Math.random() - 0.5) * WORLD;
+    const y = (Math.random() - 0.5) * WORLD;
+    const r = 80 + Math.random() * 200;
+    terrain.reefs.push({ x, y, r });
+  }
+  for (let i = 0; i < 25; i++) {
     terrain.wrecks.push({
       x: (Math.random() - 0.5) * WORLD,
       y: (Math.random() - 0.5) * WORLD,
       heading: Math.random() * 360,
-      length: 120 + Math.random() * 80,
+      length: 60 + Math.random() * 80,
     });
   }
 }
 
-function inThermal(x, y) {
-  // Thermal layer is depth-based, not x/y. So return boolean for "is player at this xy in thermal"
-  return state.player.depth >= THERMAL_TOP && state.player.depth <= THERMAL_BOT;
-}
-
-// ----------------------------------------------------------------------------
-// ENEMY AI
-// ----------------------------------------------------------------------------
-class Enemy {
-  constructor(opts) {
-    this.id = 'C' + state.nextId++;
-    this.x = opts.x;
-    this.y = opts.y;
-    this.heading = opts.heading || 0;
-    this.speed = opts.speed || 6;
-    this.depth = opts.depth || 200;
-    this.type = opts.type || 'patrol';
-    this.hull = opts.hull || 60;
-    this.maxHull = this.hull;
-    this.sonar = 100;
-    this.aware = 0;          // 0-1, increases when detecting player
-    this.state = 'patrol';   // patrol, search, stalk, attack, evade
-    this.stateT = 0;
-    this.target = null;      // last known player pos
-    this.detected = false;   // visible to player
-    this.lastSeen = 0;       // for classification freshness
-    this.bravery = opts.bravery ?? 0.6;  // 0-1, willingness to engage
-    this.pingT = -10;
-    this.torpedoCooldown = 0;
-    this.patrolTarget = { x: this.x, y: this.y };
-    this.detectQuality = opts.detectQuality ?? 0.6; // 0-1, how good their sonar is
-    this.patrolRadius = 800 + Math.random() * 600;
-    this.patrolAngle = Math.random() * Math.PI * 2;
-  }
-}
-
-function spawnEnemies(mission) {
-  state.enemies = [];
-  state.contacts = [];
-  if (mission === 0) {
-    // 2 patrol subs, close to player
-    state.enemies.push(new Enemy({
-      x: -1200, y: -800, heading: 90, speed: 6, depth: 150,
-      type: 'patrol', hull: 50, bravery: 0.5, detectQuality: 0.5,
-    }));
-    state.enemies.push(new Enemy({
-      x: 1100, y: 1000, heading: 270, speed: 5, depth: 250,
-      type: 'patrol', hull: 50, bravery: 0.4, detectQuality: 0.5,
-    }));
-    state.killsNeeded = 2;
-    state.missionName = 'INTERCEPT';
-  } else if (mission === 1) {
-    state.enemies.push(new Enemy({
-      x: -1000, y: 200, heading: 90, speed: 6, depth: 200,
-      type: 'patrol', hull: 50, detectQuality: 0.5, bravery: 0.5,
-    }));
-    state.enemies.push(new Enemy({
-      x: 1000, y: -700, heading: 200, speed: 9, depth: 180,
-      type: 'hunter', hull: 80, detectQuality: 0.75, bravery: 0.85,
-    }));
-    state.killsNeeded = 2;
-    state.missionName = 'HUNTER KILLER';
-  } else if (mission === 2) {
-    const ace = new Enemy({
-      x: 0, y: 1500, heading: 0, speed: 7, depth: 220,
-      type: 'ace', hull: 100, detectQuality: 0.85, bravery: 0.7,
-    });
-    state.enemies.push(ace);
-    state.enemies.push(new Enemy({
-      x: -600, y: 1500, heading: 0, speed: 6, depth: 200,
-      type: 'patrol', hull: 50, detectQuality: 0.5, bravery: 0.5,
-    }));
-    state.enemies.push(new Enemy({
-      x: 600, y: 1500, heading: 0, speed: 6, depth: 200,
-      type: 'patrol', hull: 50, detectQuality: 0.5, bravery: 0.5,
-    }));
-    state.killsNeeded = 1;
-    state.missionName = 'THE ACE';
-  }
-  state.kills = 0;
-}
-
-// ----------------------------------------------------------------------------
-// CONTACT DETECTION
-// ----------------------------------------------------------------------------
-// Visibility model: enemy detects player based on noise (speed), distance, thermal layer, ping
-function playerNoise() {
-  // base on speed (returns 0-100 noise level)
-  let n = state.player.speed * 6;
-  if (state.player.speed <= 3) n *= 0.2;
-  else if (state.player.speed <= 6) n *= 0.5;
-  // deep water reduces
-  if (state.player.depth > 350) n *= 0.7;
-  // ping boost
-  if (state.time - state.player.lastPingT < 6) n *= 2.0;
-  // damage = louder
-  if (state.player.hull < 50) n *= 1.3;
-  return n;
-}
-
-function enemyNoise(e) {
-  let n = e.speed * 6;
-  if (e.speed <= 3) n *= 0.3;
-  if (e.type === 'hunter') n *= 1.2;
-  if (e.type === 'ace') n *= 0.7;
-  return n;
-}
-
-// "signal strength" at distance — used for both enemy-→-player and player-→-enemy
-function signalAt(listener, target, noiseLevel) {
-  const d = dist(listener, target);
-  // Signal falls off with distance
-  const base = noiseLevel * 1000 / Math.max(100, d);
-  // Thermal layer masks both if both in it
-  const sameThermal = (target.depth >= THERMAL_TOP && target.depth <= THERMAL_BOT) &&
-                      (listener.depth >= THERMAL_TOP && listener.depth <= THERMAL_BOT);
-  if (sameThermal) return base * 0.25;
-  // Reefs mask
-  for (const r of terrain.reefs) {
-    if (dist(listener, r) < r.r && dist(target, r) < r.r) return base * 0.3;
-  }
-  return base;
-}
-
-function dist(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function angleDelta(a, b) {
-  let d = ((b - a) % 360 + 540) % 360 - 180;
-  return d;
-}
-
-// is there line of sight between two points accounting for thermal and reefs?
-// returns detection probability 0-1
-function detectionProb(listener, target, listenerNoiseFloor) {
-  // listenerNoise: how much noise the listener's own systems produce (0=passive ideal)
-  // targetNoise: how much noise the target makes
-  const d = dist(listener, target);
-  if (d > 4000) return 0;
-  const base = 1.0 - d / 4000;
-  // thermal layer masks
-  if (target.depth >= THERMAL_TOP && target.depth <= THERMAL_BOT &&
-      listener.depth >= THERMAL_TOP && listener.depth <= THERMAL_BOT) {
-    return base * 0.3;  // both in thermal, masked
-  }
-  // reefs can mask if close
-  for (const r of terrain.reefs) {
-    if (dist(listener, r) < r.r && dist(target, r) < r.r) {
-      return base * 0.4;
-    }
-  }
-  return base;
-}
-
-// ----------------------------------------------------------------------------
-// PLAYER ACTIONS
-// ----------------------------------------------------------------------------
-function doPing() {
-  if (state.time - state.player.lastPingT < 1.5) return;
-  state.player.lastPingT = state.time;
-  Audio.ping(1);
-  // reveal all enemies within range
-  for (const e of state.enemies) {
-    const d = dist(e, state.player);
-    if (d < 3500) {
-      e.detected = true;
-      e.lastSeen = state.time;
-      // player also reveals self to enemy
-      e.aware = Math.max(e.aware, 0.5);
-      e.target = { x: state.player.x, y: state.player.y };
-      e.state = 'stalk';
-    }
-  }
-  // ping particle ring
-  for (let i = 0; i < 36; i++) {
-    const a = (i / 36) * Math.PI * 2;
-    state.particles.push({
-      x: state.player.x, y: state.player.y,
-      vx: Math.cos(a) * 80, vy: Math.sin(a) * 80,
-      life: 2.5, maxLife: 2.5, color: '#00e5ff', type: 'ring',
-    });
-  }
-  toast('PING ACTIVE', 'good', 1.5);
-}
-
-function doFire() {
-  const tube = state.player.tubes[0] === 'MK48' ? 0 : state.player.tubes[1] === 'MK48' ? 1 : -1;
-  if (tube < 0) { toast('NO LOADED TUBES', 'bad', 1.5); return; }
-  if (!state.player.targetId) { toast('NO TARGET', 'warn', 1.5); return; }
-  const tgt = state.enemies.find(e => e.id === state.player.targetId);
-  if (!tgt) { toast('TARGET LOST', 'warn', 1.5); return; }
-  // hit chance depends on range, target speed, angle
-  const d = dist(state.player, tgt);
-  if (d > 4500) { toast('OUT OF RANGE', 'warn', 1.5); return; }
-  const hit = computeHitChance(tgt);
-  state.player.tubes[tube] = 'EMPTY';
-  if (tube === 0) state.player.tube1Reload = state.time;
-  else state.player.tube2Reload = state.time;
-  const torp = {
-    x: state.player.x, y: state.player.y,
-    heading: bearingTo(state.player, tgt),
-    speed: 25, owner: 'player', targetId: tgt.id,
-    age: 0, life: 18, hitChance: hit, hasHit: false,
-  };
-  state.torpedoes.push(torp);
-  Audio.torpedo();
-  toast(`TORPEDO IN WATER — HIT ${Math.round(hit * 100)}%`, hit > 0.5 ? 'good' : 'warn', 2);
-  // enemy becomes aware
-  tgt.aware = 1.0;
-  tgt.target = { x: state.player.x, y: state.player.y };
-  tgt.state = 'evade';
-}
-
-function bearingTo(a, b) {
-  return (Math.atan2(b.x - a.x, b.y - a.y) * 180 / Math.PI + 360) % 360;
-}
-
-function computeHitChance(tgt) {
-  const d = dist(state.player, tgt);
-  if (d < 200) return 0.95;
-  if (d > 5000) return 0.05;
-  let c = 0.92 - d / 8000;
-  // target moving fast = harder
-  c -= tgt.speed * 0.012;
-  // target aware (evading) = harder
-  if (tgt.state === 'evade') c -= 0.12;
-  // ping gives recent data
-  if (state.time - state.player.lastPingT < 4) c += 0.1;
-  return Math.max(0.10, Math.min(0.95, c));
-}
-
-function doDecoy() {
-  if (state.player.decoys <= 0) { toast('NO DECOYS', 'bad', 1.5); return; }
-  state.player.decoys--;
-  const decoy = {
-    x: state.player.x + (Math.random() - 0.5) * 50,
-    y: state.player.y + (Math.random() - 0.5) * 50,
-    heading: state.player.heading,
-    speed: 4,
-    life: 12,
-    type: 'decoy',
-  };
-  state.wakeTrails.push({ ...decoy, id: 'D' + state.nextId++ });
-  Audio.decoy();
-  toast('DECOY DEPLOYED', 'good', 1.5);
-  // torps targeting player will retarget
-  for (const t of state.torpedoes) {
-    if (t.owner === 'enemy' && t.targetId === 'player') {
-      // 70% chance to switch
-      if (Math.random() < 0.7) {
-        t.targetId = 'decoy';
-        t.decoyTarget = decoy;
-      }
-    }
-  }
-}
-
-// ----------------------------------------------------------------------------
-// UI HELPERS
-// ----------------------------------------------------------------------------
-const $ = id => document.getElementById(id);
-
-function setBar(id, pct, color) {
-  const el = $(id);
-  if (!el) return;
-  el.style.width = (pct * 100) + '%';
-  el.className = 'fill fill-' + color;
-}
-
-function toast(msg, type = 'info', dur = 1.5) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast show ' + (type === 'info' ? '' : type);
-  clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.className = 'toast', dur * 1000);
-}
-
-function updatePanel() {
-  // contacts list
-  const cl = $('contact-list');
-  let html = '';
-  for (const e of state.enemies) {
-    if (!e.detected && e.aware < 0.2) continue;
-    const d = dist(state.player, e);
-    const brg = bearingTo(state.player, e);
-    let cls = 'unknown';
-    let clsText = 'UNKNOWN';
-    if (e.aware > 0.6 || e.state === 'attack') { cls = 'hostile'; clsText = 'HOSTILE'; }
-    else if (e.detected && e.aware < 0.3) { cls = 'friendly'; clsText = 'NEUTRAL?'; }
-    html += `<div class="contact ${cls} ${state.player.targetId === e.id ? 'selected' : ''}" data-id="${e.id}">
-      <span class="id">${e.id}</span>
-      <span class="brg">${Math.round(brg).toString().padStart(3, '0')}°</span>
-      <span class="rng">${Math.round(d)}m</span>
-      <span class="cls">${clsText}</span>
-    </div>`;
-  }
-  if (state.torpedoes.some(t => t.owner === 'enemy')) {
-    html += `<div class="contact hostile"><span class="id">!</span><span class="brg">TORP</span><span class="rng">INCOMING</span><span class="cls">EVADE</span></div>`;
-  }
-  cl.innerHTML = html || '<div style="color:#4a5868;font-size:10px;padding:4px 0">No contacts — listen</div>';
-
-  // bind clicks
-  cl.querySelectorAll('.contact[data-id]').forEach(el => {
-    el.onclick = () => {
-      state.player.targetId = el.dataset.id;
-    };
-  });
-
-  // selected details
-  const sel = state.enemies.find(e => e.id === state.player.targetId);
-  if (sel) {
-    $('selected-section').style.display = 'block';
-    $('sel-id').textContent = sel.id;
-    $('sel-brg').textContent = Math.round(bearingTo(state.player, sel)) + '°';
-    $('sel-rng').textContent = Math.round(dist(state.player, sel)) + 'm';
-    $('sel-spd').textContent = Math.round(sel.speed) + ' kt';
-    $('sel-cls').textContent = sel.type.toUpperCase();
-    $('sel-conf').textContent = Math.round((sel.aware + sel.detected * 0.5) * 50) + '%';
-    const hit = computeHitChance(sel);
-    $('p-hit').style.width = (hit * 100) + '%';
-    $('p-hit-v').textContent = Math.round(hit * 100) + '%';
-    $('p-they').style.width = (sel.aware * 100) + '%';
-    $('p-they-v').textContent = Math.round(sel.aware * 100) + '%';
-    const det = Math.min(1, (playerNoise() / Math.max(1, dist(state.player, sel) / 100)));
-    $('p-det').style.width = Math.min(100, det * 100) + '%';
-    $('p-det-v').textContent = Math.round(Math.min(100, det * 100)) + '%';
-    const decOk = sel.state === 'evade' ? 0.65 : 0.4;
-    $('p-dec').style.width = (decOk * 100) + '%';
-    $('p-dec-v').textContent = Math.round(decOk * 100) + '%';
-  } else {
-    $('selected-section').style.display = 'none';
-  }
-
-  // ship status
-  $('st-spd').textContent = state.player.speed + ' kt';
-  $('st-spd-bar').style.width = (state.player.speed / 15 * 100) + '%';
-  $('st-spd-bar').className = 'fill ' + (state.player.speed > 10 ? 'fill-red' : state.player.speed > 6 ? 'fill-amber' : 'fill-cyan');
-  $('st-hull').textContent = Math.round(state.player.hull) + '%';
-  $('st-hull-bar').style.width = state.player.hull + '%';
-  $('st-hull-bar').className = 'fill ' + (state.player.hull > 60 ? 'fill-green' : state.player.hull < 30 ? 'fill-red' : 'fill-amber');
-  $('st-sonar').textContent = Math.round(state.player.sonar) + '%';
-  $('st-sonar-bar').style.width = state.player.sonar + '%';
-  // auto-reload tubes after 6 seconds
-  if (state.player.tubes[0] === 'EMPTY' && state.time - (state.player.tube1Reload || 0) > 6) state.player.tubes[0] = 'MK48';
-  if (state.player.tubes[1] === 'EMPTY' && state.time - (state.player.tube2Reload || 0) > 6) state.player.tubes[1] = 'MK48';
-  $('st-t1').textContent = state.player.tubes[0];
-  $('st-t1').className = 'v ' + (state.player.tubes[0] === 'MK48' ? 'good' : 'bad');
-  $('st-t2').textContent = state.player.tubes[1];
-  $('st-t2').className = 'v ' + (state.player.tubes[1] === 'MK48' ? 'good' : 'bad');
-  $('st-dec').textContent = state.player.decoys;
-
-  // topbar
-  $('v-spd').textContent = state.player.speed;
-  $('v-spd').className = 'v' + (state.player.speed > 10 ? ' bad' : '');
-  $('v-hdg').textContent = Math.round(state.player.heading).toString().padStart(3, '0');
-  $('v-dep').textContent = Math.round(state.player.depth);
-  $('v-dep').className = 'v' + (state.player.depth > 380 ? ' bad' : state.player.depth > 320 ? ' warn' : '');
-  $('v-hull').textContent = Math.round(state.player.hull);
-  $('v-hull').className = 'v' + (state.player.hull < 30 ? ' bad' : state.player.hull < 60 ? ' warn' : '');
-  const sig = playerNoise();
-  const sigEl = $('sig-val');
-  if (sig < 30) { sigEl.textContent = 'LOW'; sigEl.className = 'v'; }
-  else if (sig < 70) { sigEl.textContent = 'MED'; sigEl.className = 'v med'; }
-  else { sigEl.textContent = 'HIGH'; sigEl.className = 'v bad'; }
-  $('v-score').textContent = state.score;
-}
-
-// ----------------------------------------------------------------------------
-// UPDATE LOOP
-// ----------------------------------------------------------------------------
-function update(dt) {
-  if (state.mode !== 'play') return;
-  state.time += dt;
-  state.missionTime += dt;
-  const p = state.player;
-
-  // ---- input → player ----
-  // keys
-  if (state.keys['w'] || state.keys['arrowup']) {
-    p.desiredSpeed = Math.min(15, p.desiredSpeed + 8 * dt);
-  }
-  if (state.keys['s'] || state.keys['arrowdown']) {
-    p.desiredSpeed = Math.max(0, p.desiredSpeed - 10 * dt);
-  }
-  if (state.keys['q']) p.desiredDepth = Math.max(50, p.desiredDepth - 60 * dt);
-  if (state.keys['e']) p.desiredDepth = Math.min(500, p.desiredDepth + 60 * dt);
-  // turn toward mouse
-  if (state.mouse.onMap) {
-    const m = screenToWorld(state.mouse.x, state.mouse.y);
-    const targetHeading = bearingTo(p, m);
-    const delta = angleDelta(p.heading, targetHeading);
-    p.turning = Math.sign(delta) * Math.min(1, Math.abs(delta) / 30);
-  } else {
-    if (state.keys['a'] || state.keys['arrowleft']) p.turning = -1;
-    else if (state.keys['d'] || state.keys['arrowright']) p.turning = 1;
-    else p.turning = 0;
-  }
-  p.heading = (p.heading + p.turning * 60 * dt + 360) % 360;
-  p.speed += (p.desiredSpeed - p.speed) * Math.min(1, 3 * dt);
-  p.depth += (p.desiredDepth - p.depth) * Math.min(1, 2 * dt);
-
-  // move player
-  const spd = p.speed * 0.05;  // knots to m/s roughly
-  p.x += Math.sin(p.heading * Math.PI / 180) * spd * dt;
-  p.y += Math.cos(p.heading * Math.PI / 180) * spd * dt;
-  // clamp
-  p.x = Math.max(-WORLD/2, Math.min(WORLD/2, p.x));
-  p.y = Math.max(-WORLD/2, Math.min(WORLD/2, p.y));
-
-  // camera follows player
-  state.camX = p.x;
-  state.camY = p.y;
-
-  // pressure damage at crush depth
-  if (p.depth > CRUSH_DEPTH) {
-    p.hull -= (p.depth - CRUSH_DEPTH) * 0.05 * dt;
-  }
-
-  // wake trail behind player
-  if (p.speed > 2) {
-    if (Math.random() < p.speed * dt * 0.3) {
-      state.wakeTrails.push({
-        x: p.x - Math.sin(p.heading * Math.PI / 180) * 12,
-        y: p.y - Math.cos(p.heading * Math.PI / 180) * 12,
-        heading: p.heading, speed: 0, life: 30, type: 'wake',
-      });
-    }
-  }
-
-  // ---- enemies ----
-  for (const e of state.enemies) {
-    if (e.hull <= 0) continue;
-    e.stateT += dt;
-    e.torpedoCooldown = Math.max(0, e.torpedoCooldown - dt);
-
-    const d = dist(e, p);
-    const sig = signalAt(e, p, playerNoise());  // how much the enemy can "hear" the player
-
-    // AI state machine
-    if (e.state === 'patrol') {
-      e.patrolAngle += dt * 0.15;
-      const tx = e.patrolTarget.x + Math.cos(e.patrolAngle) * e.patrolRadius;
-      const ty = e.patrolTarget.y + Math.sin(e.patrolAngle) * e.patrolRadius;
-      e.heading = bearingTo(e, { x: tx, y: ty });
-      e.x += Math.sin(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-      e.y += Math.cos(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-      // detect check
-      if (sig > 0.5 * e.detectQuality) {
-        e.aware += dt * 0.5;
-        if (e.aware > 0.4) {
-          e.state = 'search';
-          e.target = { x: p.x, y: p.y };
-          e.detected = true;
-        }
-      } else {
-        e.aware = Math.max(0, e.aware - dt * 0.2);
-      }
-    } else if (e.state === 'search') {
-      if (e.target) {
-        e.heading = bearingTo(e, e.target);
-        e.x += Math.sin(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-        e.y += Math.cos(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-        if (dist(e, e.target) < 100) {
-          e.target = null;
-          e.state = 'patrol';
-          e.detected = false;
-        }
-      }
-      if (sig > 0.4 * e.detectQuality) {
-        e.aware += dt;
-        if (e.aware > 0.7) {
-          e.state = 'stalk';
-          e.target = { x: p.x, y: p.y };
-        }
-      } else {
-        e.aware = Math.max(0, e.aware - dt * 0.3);
-        if (e.aware < 0.2) { e.state = 'patrol'; e.detected = false; e.target = null; }
-      }
-    } else if (e.state === 'stalk') {
-      if (e.target) {
-        e.heading = bearingTo(e, e.target);
-        e.x += Math.sin(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-        e.y += Math.cos(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-        if (dist(e, e.target) < 50) e.target = { x: p.x, y: p.y };
-      } else {
-        e.target = { x: p.x, y: p.y };
-      }
-      // if close enough, fire
-      if (d < 2800 && e.torpedoCooldown <= 0) {
-        e.state = 'attack';
-      }
-    } else if (e.state === 'attack') {
-      if (e.torpedoCooldown <= 0) {
-        e.torpedoCooldown = 5;
-        fireEnemyTorpedo(e, p);
-        if (e.bravery < 0.5) e.state = 'evade';
-        else e.state = 'stalk';
-      }
-    } else if (e.state === 'evade') {
-      const away = bearingTo(p, e);
-      e.heading = away;
-      e.speed = Math.min(10, e.speed + dt * 1.5);
-      e.x += Math.sin(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-      e.y += Math.cos(e.heading * Math.PI / 180) * e.speed * 0.05 * dt;
-      // calm down if no contact in a while OR distance grew
-      if (d > 3500 || (e.stateT > 8 && sig < 0.2)) {
-        e.state = 'patrol';
-        e.detected = false;
-        e.aware = 0;
-        e.speed = Math.max(5, e.speed * 0.5);
-      }
-    }
-
-    // ace: cunning escape when hurt
-    if (e.type === 'ace' && e.hull < 50 && e.state !== 'evade') {
-      e.state = 'evade';
-    }
-
-    // player passive detection of enemy
-    if (!e.detected) {
-      const eSig = signalAt(p, e, enemyNoise(e));
-      if (eSig > 0.4) {
-        e.detected = true;
-        e.lastSeen = state.time;
-        if (state.time - e.lastPingT > 8) {
-          Audio.blip('enemy');
-        }
-      }
-    } else {
-      e.lastSeen = state.time;
-    }
-
-    // wake trail
-    if (e.speed > 2 && e.detected) {
-      if (Math.random() < e.speed * dt * 0.2) {
-        state.wakeTrails.push({
-          x: e.x - Math.sin(e.heading * Math.PI / 180) * 12,
-          y: e.y - Math.cos(e.heading * Math.PI / 180) * 12,
-          heading: e.heading, speed: 0, life: 25, type: 'wake',
-        });
-      }
-    }
-  }
-
-  // ---- torpedoes ----
-  for (const t of state.torpedoes) {
-    t.age += dt;
-    // target
-    let target = null;
-    if (t.targetId === 'player') target = p;
-    else if (t.targetId === 'decoy') target = t.decoyTarget;
-    else target = state.enemies.find(e => e.id === t.targetId);
-
-    if (target && target.hull > 0) {
-      const brg = bearingTo(t, target);
-      const delta = angleDelta(t.heading, brg);
-      t.heading += Math.sign(delta) * Math.min(60 * dt, Math.abs(delta));
-    }
-    t.x += Math.sin(t.heading * Math.PI / 180) * t.speed * dt;
-    t.y += Math.cos(t.heading * Math.PI / 180) * t.speed * dt;
-    // wake trail
-    if (Math.random() < 0.5) {
-      state.wakeTrails.push({
-        x: t.x - Math.sin(t.heading * Math.PI / 180) * 5,
-        y: t.y - Math.cos(t.heading * Math.PI / 180) * 5,
-        heading: t.heading, speed: 0, life: 10, type: 'torp_wake',
-      });
-    }
-    // hit check
-    if (target && target.hull > 0 && dist(t, target) < 40) {
-      if (t.owner === 'player' && target !== p) {
-        // hit chance resolution
-        const hit = Math.random() < t.hitChance;
-        if (hit) {
-          target.hull -= 60 + Math.random() * 30;
-          Audio.explosion();
-          for (let i = 0; i < 30; i++) {
-            const a = Math.random() * Math.PI * 2;
-            state.particles.push({
-              x: target.x, y: target.y, vx: Math.cos(a) * (40 + Math.random() * 60), vy: Math.sin(a) * (40 + Math.random() * 60),
-              life: 1.5, maxLife: 1.5, color: '#ff8800', type: 'spark',
-            });
-          }
-          toast(`HIT! ${target.id} ${Math.round(target.hull)}% HULL`, 'good', 2);
-          if (target.hull <= 0) {
-            state.kills++;
-            state.score += 500;
-            target.state = 'sunk';
-            toast(`${target.id} SUNK`, 'good', 3);
-            Audio.explosion();
-            // big explosion
-            for (let i = 0; i < 80; i++) {
-              const a = Math.random() * Math.PI * 2;
-              state.particles.push({
-                x: target.x, y: target.y, vx: Math.cos(a) * (80 + Math.random() * 120), vy: Math.sin(a) * (80 + Math.random() * 120),
-                life: 3, maxLife: 3, color: '#ff3d3d', type: 'spark',
-              });
-            }
-            checkWin();
-          }
-        } else {
-          toast('TORPEDO MISSED', 'warn', 1.5);
-          // splash
-          for (let i = 0; i < 10; i++) {
-            const a = Math.random() * Math.PI * 2;
-            state.particles.push({
-              x: target.x, y: target.y, vx: Math.cos(a) * 20, vy: Math.sin(a) * 20,
-              life: 0.8, maxLife: 0.8, color: '#4a5868', type: 'spark',
-            });
-          }
-        }
-        t.hasHit = true;
-      } else if (t.owner === 'enemy' && target === p) {
-        // player hit
-        const dmg = 30 + Math.random() * 25;
-        p.hull -= dmg;
-        Audio.hit();
-        Audio.warning();
-        toast(`WE'RE HIT — ${Math.round(dmg)} DMG`, 'bad', 2);
-        // sonar degraded
-        p.sonar = Math.max(20, p.sonar - 15);
-        for (let i = 0; i < 20; i++) {
-          const a = Math.random() * Math.PI * 2;
-          state.particles.push({
-            x: p.x, y: p.y, vx: Math.cos(a) * 50, vy: Math.sin(a) * 50,
-            life: 1.2, maxLife: 1.2, color: '#ff3d3d', type: 'spark',
-          });
-        }
-        t.hasHit = true;
-        checkLose();
-      }
-    }
-  }
-  state.torpedoes = state.torpedoes.filter(t => t.age < t.life && !t.hasHit);
-
-  // particles
-  for (const pa of state.particles) {
-    pa.life -= dt;
-    pa.x += pa.vx * dt;
-    pa.y += pa.vy * dt;
-    pa.vx *= 0.96;
-    pa.vy *= 0.96;
-  }
-  state.particles = state.particles.filter(p => p.life > 0);
-
-  // wake trails
-  for (const w of state.wakeTrails) w.life -= dt;
-  state.wakeTrails = state.wakeTrails.filter(w => w.life > 0);
-
-  // sonar regeneration
-  if (p.sonar < 100) p.sonar = Math.min(100, p.sonar + dt * 2);
-}
-
-function fireEnemyTorpedo(e, p) {
-  const brg = bearingTo(e, p);
-  const d = dist(e, p);
-  // accuracy degrades with distance
-  const acc = Math.max(8, d / 80);
-  const jitter = (Math.random() - 0.5) * acc;
-  const t = {
-    x: e.x, y: e.y,
-    heading: (brg + jitter + 360) % 360,
-    speed: 20, owner: 'enemy', targetId: 'player', age: 0, life: 12,
-    hitChance: 0.7,  // for explosion FX
-  };
-  state.torpedoes.push(t);
-  Audio.torpedo();
-  // alert player if close
-  if (d < 2500) {
-    toast(`TORPEDO IN WATER FROM ${e.id}!`, 'bad', 2);
-  }
-}
-
-function checkWin() {
-  if (state.kills >= state.killsNeeded) {
-    state.mode = 'win';
-    setTimeout(() => {
-      $('ov-title').textContent = 'MISSION COMPLETE';
-      $('ov-sub').textContent = `${state.missionName} — ${state.score} POINTS`;
-      $('ov-brief').innerHTML = `You eliminated all hostile contacts in ${state.missionName}.<br><br>${state.mission < 2 ? 'The next patrol awaits. Stand by for mission briefing.' : 'You survived the Ace. Return to base.'}`;
-      $('start-btn').textContent = state.mission < 2 ? 'NEXT MISSION' : 'PATROL AGAIN';
-      $('ov-controls').style.display = 'none';
-      $('ov-mission').textContent = state.mission < 2 ? `MISSION ${state.mission + 2}: ${['HUNTER KILLER', 'THE ACE'][state.mission]}` : 'CAMPAIGN COMPLETE';
-      $('overlay').classList.remove('hidden');
-      if (state.mission < 2) state.mission++;
-    }, 1500);
-  }
-}
-
-function checkLose() {
-  if (state.player.hull <= 0) {
-    state.mode = 'lose';
-    setTimeout(() => {
-      $('ov-title').textContent = 'TETHYS LOST';
-      $('ov-sub').textContent = 'HULL BREACH — ALL HANDS';
-      $('ov-brief').innerHTML = `Your submarine has been destroyed. Final score: ${state.score}.<br><br>The trench keeps its dead.`;
-      $('start-btn').textContent = 'TRY AGAIN';
-      $('ov-controls').style.display = 'none';
-      $('ov-mission').textContent = '';
-      $('overlay').classList.remove('hidden');
-    }, 1500);
-  }
-}
-
-// ----------------------------------------------------------------------------
-// RENDER
-// ----------------------------------------------------------------------------
-function render() {
-  const w = cv.clientWidth, h = cv.clientHeight;
-  ctx.fillStyle = '#03101a';
-  ctx.fillRect(0, 0, w, h);
-
-  // grid
-  ctx.strokeStyle = 'rgba(40, 80, 120, 0.15)';
-  ctx.lineWidth = 1;
-  const gridSize = 500;
-  const tl = screenToWorld(0, 0);
-  const br = screenToWorld(w, h);
-  const startX = Math.floor(tl.x / gridSize) * gridSize;
-  const startY = Math.floor(tl.y / gridSize) * gridSize;
-  for (let x = startX; x < br.x; x += gridSize) {
-    const s = worldToScreen(x, tl.y);
-    ctx.beginPath();
-    ctx.moveTo(s.x, 0);
-    ctx.lineTo(s.x, h);
-    ctx.stroke();
-  }
-  for (let y = startY; y < br.y; y += gridSize) {
-    const s = worldToScreen(tl.x, y);
-    ctx.beginPath();
-    ctx.moveTo(0, s.y);
-    ctx.lineTo(w, s.y);
-    ctx.stroke();
-  }
-
-  // world border
-  ctx.strokeStyle = 'rgba(255, 60, 60, 0.3)';
-  ctx.lineWidth = 2;
-  const corner1 = worldToScreen(-WORLD/2, -WORLD/2);
-  const corner2 = worldToScreen(WORLD/2, WORLD/2);
-  ctx.strokeRect(corner1.x, corner1.y, corner2.x - corner1.x, corner2.y - corner1.y);
-
-  // thermal layer visualization (if visible at this depth)
-  if (inThermal(0, 0)) {
-    ctx.fillStyle = 'rgba(0, 150, 200, 0.05)';
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  // reefs
-  for (const r of terrain.reefs) {
-    const s = worldToScreen(r.x, r.y);
-    if (s.x + r.r * state.zoom < 0 || s.x - r.r * state.zoom > w) continue;
-    ctx.fillStyle = 'rgba(60, 100, 80, 0.4)';
-    ctx.strokeStyle = 'rgba(100, 200, 150, 0.6)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, r.r * state.zoom, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // vents
-  for (const v of terrain.vents) {
-    const s = worldToScreen(v.x, v.y);
-    if (s.x < 0 || s.x > w) continue;
-    ctx.fillStyle = 'rgba(255, 100, 50, 0.15)';
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, v.r * state.zoom, 0, Math.PI * 2);
-    ctx.fill();
-    // bubbles
-    if (Math.random() < 0.3) {
-      state.bubbles.push({ x: v.x + (Math.random() - 0.5) * v.r, y: v.y + v.r * 0.3, life: 2, maxLife: 2 });
-    }
-  }
-
-  // wrecks
-  for (const w of terrain.wrecks) {
-    const s = worldToScreen(w.x, w.y);
-    if (s.x < -100 || s.x > cv.clientWidth + 100) continue;
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(-w.heading * Math.PI / 180);
-    ctx.fillStyle = 'rgba(80, 60, 50, 0.7)';
-    ctx.fillRect(-w.length * state.zoom / 2, -15, w.length * state.zoom, 30);
-    ctx.strokeStyle = 'rgba(150, 120, 100, 0.8)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-w.length * state.zoom / 2, -15, w.length * state.zoom, 30);
-    ctx.restore();
-  }
-
-  // wake trails
-  for (const wk of state.wakeTrails) {
-    const s = worldToScreen(wk.x, wk.y);
-    const a = (wk.life / (wk.type === 'wake' ? 30 : wk.type === 'torp_wake' ? 10 : 30)) * 0.4;
-    ctx.fillStyle = wk.type === 'torp_wake' ? `rgba(255, 200, 100, ${a})` : `rgba(150, 200, 220, ${a * 0.5})`;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // bubbles
-  for (const b of state.bubbles) {
-    b.life -= 0.016;
-    b.y -= 30 * 0.016;
-    const s = worldToScreen(b.x, b.y);
-    ctx.fillStyle = `rgba(200, 230, 255, ${b.life / b.maxLife * 0.5})`;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  state.bubbles = state.bubbles.filter(b => b.life > 0);
-
-  // enemies
-  for (const e of state.enemies) {
-    if (e.hull <= 0) continue;
-    if (!e.detected && e.aware < 0.15) continue;
-    const s = worldToScreen(e.x, e.y);
-    if (s.x < -50 || s.x > cv.clientWidth + 50) continue;
-    const size = 20;
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(-e.heading * Math.PI / 180);
-    // halo when in attack mode
-    if (e.state === 'attack' || e.state === 'stalk') {
-      ctx.fillStyle = e.state === 'attack' ? 'rgba(255, 60, 60, 0.25)' : 'rgba(255, 100, 80, 0.15)';
-      ctx.beginPath();
-      ctx.arc(0, 0, 24, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // body
-    const cls = e.state === 'attack' ? '#ff3d3d' : e.state === 'evade' ? '#ffb300' : e.aware > 0.5 ? '#ff6060' : '#806040';
-    ctx.fillStyle = cls;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // conning tower
-    ctx.fillRect(-4, -5, 8, 10);
-    ctx.strokeRect(-4, -5, 8, 10);
-    ctx.restore();
-    // label
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '10px monospace';
-    ctx.fillText(e.id, s.x - 12, s.y - 14);
-    // bearing line to player if targeted
-    if (state.player.targetId === e.id) {
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
-      ctx.setLineDash([4, 4]);
-      ctx.beginPath();
-      const ps = worldToScreen(state.player.x, state.player.y);
-      ctx.moveTo(ps.x, ps.y);
-      ctx.lineTo(s.x, s.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
-
-  // torpedoes
-  for (const t of state.torpedoes) {
-    const s = worldToScreen(t.x, t.y);
-    const col = t.owner === 'player' ? '#00e5ff' : '#ff3d3d';
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(-t.heading * Math.PI / 180);
-    ctx.fillStyle = col;
-    ctx.fillRect(-6, -2, 12, 4);
-    ctx.restore();
-    // glow
-    ctx.fillStyle = col + '40';
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // player
-  const ps = worldToScreen(state.player.x, state.player.y);
-  ctx.save();
-  ctx.translate(ps.x, ps.y);
-  ctx.rotate(-state.player.heading * Math.PI / 180);
-  // halo
-  ctx.fillStyle = 'rgba(255, 179, 0, 0.18)';
+function drawSubShape(scale, alpha = 1) {
+  // Submarine: oval hull, conning tower, fins, propeller
+  // Length ~36, width ~10
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = alpha;
+  // hull shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
   ctx.beginPath();
-  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.ellipse(0, 4, 22, 6, 0, 0, Math.PI * 2);
   ctx.fill();
-  // body
-  ctx.fillStyle = '#ffb300';
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2;
+  // hull
+  const grad = ctx.createLinearGradient(0, -8, 0, 8);
+  grad.addColorStop(0, '#f0c050');
+  grad.addColorStop(0.5, '#d4a020');
+  grad.addColorStop(1, '#806010');
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // bow point
+  ctx.fillStyle = '#f0c050';
+  ctx.beginPath();
+  ctx.moveTo(22, 0);
+  ctx.lineTo(14, -5);
+  ctx.lineTo(14, 5);
+  ctx.closePath();
   ctx.fill();
   ctx.stroke();
   // conning tower
-  ctx.fillStyle = '#cc8800';
-  ctx.fillRect(-5, -7, 10, 14);
-  ctx.strokeRect(-5, -7, 10, 14);
-  // bow mark
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#806010';
+  ctx.fillRect(-5, -7, 10, 4);
+  ctx.strokeRect(-5, -7, 10, 4);
+  ctx.fillStyle = '#404000';
+  ctx.fillRect(-3, -10, 6, 3);
+  // periscope
+  ctx.fillStyle = '#222';
+  ctx.fillRect(0, -14, 1, 4);
+  // fins (sail planes)
+  ctx.fillStyle = '#a07010';
   ctx.beginPath();
-  ctx.moveTo(22, 0);
-  ctx.lineTo(15, -3);
-  ctx.lineTo(15, 3);
+  ctx.moveTo(-18, 0);
+  ctx.lineTo(-22, -8);
+  ctx.lineTo(-14, 0);
   ctx.closePath();
   ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(-18, 0);
+  ctx.lineTo(-22, 8);
+  ctx.lineTo(-14, 0);
+  ctx.closePath();
+  ctx.fill();
+  // propeller
+  ctx.fillStyle = '#ff4040';
+  ctx.beginPath();
+  ctx.arc(-22, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function renderSub(sub, isPlayer) {
+  const s = worldToScreen(sub.x, sub.y);
+  // off-screen cull
+  if (s.x < -60 || s.x > window.innerWidth + 60 || s.y < -60 || s.y > window.innerHeight + 60) return;
+  // blink when damaged
+  if (isPlayer && state.player && state.player.invuln > 0) {
+    if (Math.floor(state.time * 20) % 2) return;
+  }
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(-sub.heading * Math.PI / 180);
+
+  if (isPlayer) {
+    drawSubShape(state.camZoom, 1);
+  } else {
+    // enemy: red
+    ctx.save();
+    const grad = ctx.createLinearGradient(0, -8, 0, 8);
+    grad.addColorStop(0, '#ff5050');
+    grad.addColorStop(0.5, '#c02020');
+    grad.addColorStop(1, '#601010');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = '#600000';
+    ctx.fillRect(-5, -7, 10, 4);
+    ctx.strokeRect(-5, -7, 10, 4);
+    ctx.fillStyle = '#ff4040';
+    ctx.beginPath();
+    ctx.arc(-22, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    // type indicator
+    if (sub.type === 'ace') {
+      // gold trim
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 22, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (sub.type === 'hunter') {
+      // bigger fins
+      ctx.fillStyle = '#600000';
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(-26, -10);
+      ctx.lineTo(-14, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(-26, 10);
+      ctx.lineTo(-14, 0);
+      ctx.closePath();
+      ctx.fill();
+    }
+    if (sub.type === 'swarm') {
+      // smaller
+      ctx.scale(0.7, 0.7);
+    }
+    ctx.restore();
+  }
   ctx.restore();
 
-  // you-are-here label
-  ctx.fillStyle = '#ffb300';
-  ctx.font = 'bold 10px monospace';
-  ctx.fillText('YOU', ps.x - 10, ps.y - 24);
-
-  // bearing line from player to mouse
-  if (state.mouse.onMap) {
-    ctx.strokeStyle = 'rgba(255, 179, 0, 0.3)';
-    ctx.setLineDash([3, 6]);
-    ctx.lineWidth = 1;
+  // HP bar above sub
+  const hpPct = sub.hull / sub.maxHull;
+  if (!isPlayer || hpPct < 1) {
+    const bw = 36;
+    const bx = s.x - bw/2;
+    const by = s.y - 22;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(bx, by, bw, 4);
+    ctx.fillStyle = hpPct > 0.5 ? '#00e676' : hpPct > 0.25 ? '#ffb300' : '#ff3d3d';
+    ctx.fillRect(bx, by, bw * hpPct, 4);
+  }
+  // selected target ring
+  if (state.selectedTarget && sub === state.enemies.find(e => e.id === state.selectedTarget)) {
+    ctx.strokeStyle = '#ff3d3d';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.lineDashOffset = -frame * 0.2;
     ctx.beginPath();
-    ctx.moveTo(ps.x, ps.y);
-    ctx.lineTo(state.mouse.x, state.mouse.y);
+    ctx.arc(s.x, s.y, 32, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }
-
-  // particles
-  for (const pa of state.particles) {
-    const s = worldToScreen(pa.x, pa.y);
-    const a = pa.life / pa.maxLife;
-    ctx.fillStyle = pa.color;
-    ctx.globalAlpha = a;
-    if (pa.type === 'ring') {
-      ctx.strokeStyle = pa.color;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, (1 - a) * 200, 0, Math.PI * 2);
-      ctx.stroke();
-    } else {
-      ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
-    }
-    ctx.globalAlpha = 1;
+  // awareness indicator
+  if (!isPlayer && sub.awareness > 0.3) {
+    ctx.fillStyle = `rgba(255, 60, 60, ${sub.awareness})`;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, 28 + Math.sin(frame * 0.1) * 2, 0, Math.PI * 2);
+    ctx.fill();
   }
-
-  // ping rings fade
-  // overlay: crush depth warning
-  if (state.player.depth > 380) {
-    ctx.fillStyle = `rgba(255, 60, 60, ${(state.player.depth - 380) / 200 * 0.3})`;
-    ctx.fillRect(0, 0, w, h);
-  }
-
-  // minimap
-  renderMinimap();
 }
 
+function renderTorpedo(t) {
+  const s = worldToScreen(t.x, t.y);
+  if (s.x < -20 || s.x > window.innerWidth + 20 || s.y < -20 || s.y > window.innerHeight + 20) return;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(-t.heading * Math.PI / 180);
+  const col = t.owner === 'player' ? '#00e5ff' : '#ff5050';
+  // body
+  ctx.fillStyle = col;
+  ctx.fillRect(-6, -2, 12, 4);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(-6, -2, 12, 4);
+  // tip
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.moveTo(6, 0);
+  ctx.lineTo(3, -2);
+  ctx.lineTo(3, 2);
+  ctx.closePath();
+  ctx.fill();
+  // glow
+  ctx.restore();
+  ctx.fillStyle = col + '40';
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, 10, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function renderBubble(b) {
+  const s = worldToScreen(b.x, b.y);
+  if (s.x < -10 || s.x > window.innerWidth + 10) return;
+  ctx.fillStyle = `rgba(180, 220, 255, ${b.life / b.maxLife * 0.6})`;
+  ctx.strokeStyle = `rgba(220, 240, 255, ${b.life / b.maxLife * 0.3})`;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, b.size, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function renderParticle(p) {
+  const s = worldToScreen(p.x, p.y);
+  const a = Math.max(0, p.life / p.maxLife);
+  if (p.type === 'ring') {
+    ctx.strokeStyle = p.color;
+    ctx.globalAlpha = a * 0.5;
+    ctx.lineWidth = 2;
+    const radius = (1 - a) * 200;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.globalAlpha = a;
+    ctx.fillStyle = p.color;
+    const size = (p.size || 3) * state.camZoom;
+    ctx.fillRect(s.x - size/2, s.y - size/2, size, size);
+    ctx.globalAlpha = 1;
+  }
+}
+
+function renderDecoy(d) {
+  const s = worldToScreen(d.x, d.y);
+  if (s.x < -20 || s.x > window.innerWidth + 20) return;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.rotate(-d.heading * Math.PI / 180);
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#ff8800';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 10, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  // label
+  ctx.fillStyle = '#ff8800';
+  ctx.font = '9px monospace';
+  ctx.fillText('DECOY', s.x - 14, s.y - 12);
+}
+
+function renderCrosshair() {
+  if (state.mode !== 'play') return;
+  const x = state.mouseX, y = state.mouseY;
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.7)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 12, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x - 18, y); ctx.lineTo(x - 8, y);
+  ctx.moveTo(x + 8, y); ctx.lineTo(x + 18, y);
+  ctx.moveTo(x, y - 18); ctx.lineTo(x, y - 8);
+  ctx.moveTo(x, y + 8); ctx.lineTo(x, y + 18);
+  ctx.stroke();
+  // aim line from player
+  if (state.player) {
+    const ps = worldToScreen(state.player.x, state.player.y);
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.15)';
+    ctx.setLineDash([3, 6]);
+    ctx.beginPath();
+    ctx.moveTo(ps.x, ps.y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function renderTargetReticle() {
+  // click to select: pick nearest enemy within 30px of mouse
+  if (state.mouseDown && state.mode === 'play') {
+    // find nearest enemy to mouse in screen space
+    let nearest = null, nd = 40;
+    for (const e of state.enemies) {
+      if (e.hull <= 0) continue;
+      const s = worldToScreen(e.x, e.y);
+      const d = Math.hypot(s.x - state.mouseX, s.y - state.mouseY);
+      if (d < nd) { nearest = e; nd = d; }
+    }
+    state.selectedTarget = nearest ? nearest.id : null;
+  }
+}
+
+// ============================================================================
+// MINIMAP
+// ============================================================================
 function renderMinimap() {
-  const mw = 160, mh = 160;
-  minimapCtx.fillStyle = '#03101a';
+  const mw = minimap.width, mh = minimap.height;
+  minimapCtx.fillStyle = 'rgba(5, 16, 24, 0.85)';
   minimapCtx.fillRect(0, 0, mw, mh);
-  minimapCtx.strokeStyle = '#1a2530';
+  minimapCtx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+  minimapCtx.lineWidth = 1;
   minimapCtx.strokeRect(0, 0, mw, mh);
   const scale = mw / WORLD;
   // reefs
+  minimapCtx.fillStyle = 'rgba(60, 100, 80, 0.5)';
   for (const r of terrain.reefs) {
-    minimapCtx.fillStyle = 'rgba(60, 100, 80, 0.6)';
+    const x = mw/2 + r.x * scale;
+    const y = mh/2 + r.y * scale;
+    const rad = Math.max(1, r.r * scale);
     minimapCtx.beginPath();
-    minimapCtx.arc(mw/2 + r.x * scale, mh/2 + r.y * scale, Math.max(2, r.r * scale), 0, Math.PI * 2);
+    minimapCtx.arc(x, y, rad, 0, Math.PI * 2);
     minimapCtx.fill();
   }
   // enemies
   for (const e of state.enemies) {
     if (e.hull <= 0) continue;
-    if (!e.detected && e.aware < 0.15) continue;
-    const x = mw/2 + e.x * scale, y = mh/2 + e.y * scale;
-    minimapCtx.fillStyle = e.state === 'attack' ? '#ff3d3d' : '#ff6060';
-    minimapCtx.fillRect(x - 2, y - 2, 4, 4);
+    const x = mw/2 + e.x * scale;
+    const y = mh/2 + e.y * scale;
+    if (x < 0 || x > mw || y < 0 || y > mh) continue;
+    minimapCtx.fillStyle = e.sawPlayer ? '#ff3d3d' : '#ff6060';
+    minimapCtx.beginPath();
+    minimapCtx.arc(x, y, 2, 0, Math.PI * 2);
+    minimapCtx.fill();
   }
   // player
-  const px = mw/2 + state.player.x * scale, py = mh/2 + state.player.y * scale;
-  minimapCtx.fillStyle = '#ffb300';
-  minimapCtx.fillRect(px - 3, py - 3, 6, 6);
-  // label
-  minimapCtx.fillStyle = '#4a5868';
-  minimapCtx.font = '8px monospace';
-  minimapCtx.fillText('TACTICAL MAP', 4, 10);
+  if (state.player) {
+    const x = mw/2 + state.player.x * scale;
+    const y = mh/2 + state.player.y * scale;
+    minimapCtx.fillStyle = '#ffb300';
+    minimapCtx.beginPath();
+    minimapCtx.arc(x, y, 3, 0, Math.PI * 2);
+    minimapCtx.fill();
+    // heading indicator
+    minimapCtx.strokeStyle = '#ffb300';
+    minimapCtx.lineWidth = 1;
+    minimapCtx.beginPath();
+    minimapCtx.moveTo(x, y);
+    minimapCtx.lineTo(x + Math.sin(state.player.heading * Math.PI / 180) * 8, y + Math.cos(state.player.heading * Math.PI / 180) * 8);
+    minimapCtx.stroke();
+  }
+  // view frustum
+  const vs = state.camZoom * window.innerWidth / 2;
+  const vx = mw/2 + state.camX * scale;
+  const vy = mh/2 + state.camY * scale;
+  minimapCtx.strokeStyle = 'rgba(0, 229, 255, 0.4)';
+  minimapCtx.lineWidth = 1;
+  minimapCtx.strokeRect(vx - vs * scale, vy - vs * scale, vs * 2 * scale, vs * 2 * scale);
 }
 
-// ----------------------------------------------------------------------------
-// GAME LOOP
-// ----------------------------------------------------------------------------
+// ============================================================================
+// HUD
+// ============================================================================
+function updateHUD() {
+  const p = state.player;
+  if (!p) return;
+  document.getElementById('hudHull').textContent = Math.max(0, Math.round(p.hull));
+  document.getElementById('hudHull').className = 'v' + (p.hull < 30 ? ' bad' : p.hull < 60 ? ' warn' : '');
+  document.getElementById('hudHullBar').style.width = Math.max(0, p.hull) + '%';
+  document.getElementById('hudSpeed').textContent = p.speed.toFixed(0);
+  document.getElementById('hudSpeed').className = 'v' + (p.speed > 10 ? ' warn' : '');
+  document.getElementById('hudDepth').textContent = Math.round(p.depth);
+  document.getElementById('hudDepth').className = 'v' + (p.depth > 380 ? ' bad' : p.depth > 250 ? ' warn' : '');
+  document.getElementById('hudWave').textContent = state.wave;
+  document.getElementById('hudContacts').textContent = state.enemies.filter(e => e.hull > 0).length;
+  document.getElementById('hudKills').textContent = state.kills;
+  document.getElementById('hudScore').textContent = state.score;
+  document.getElementById('hudReload').textContent = p.cooldown > 0 ? p.cooldown.toFixed(1) + 's' : 'READY';
+  document.getElementById('hudReload').className = 'v' + (p.cooldown > 0 ? ' warn' : ' good');
+  document.getElementById('hudDecoys').textContent = p.decoys;
+}
+
+// resize
+window.addEventListener('resize', () => {
+  // canvas auto-sizes in render
+});
+
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
+let lastT = 0;
 function loop(t) {
   const now = t / 1000;
-  if (!state.lastTime) state.lastTime = now;
-  let dt = now - state.lastTime;
-  state.lastTime = now;
-  if (dt > 0.1) dt = 0.1;  // cap
-
+  if (!lastT) lastT = now;
+  let dt = now - lastT;
+  lastT = now;
+  if (dt > 0.1) dt = 0.1;
   if (state.mode === 'play') {
-    update(dt);
+    updatePlayer(dt);
+    updateEnemies(dt);
+    updateTorpedoes(dt);
+    updateParticles(dt);
+    updateCamera();
+    checkWaveEnd();
   }
   render();
-  updatePanel();
+  renderMinimap();
+  updateHUD();
   requestAnimationFrame(loop);
 }
 
-// ----------------------------------------------------------------------------
-// INPUT
-// ----------------------------------------------------------------------------
-window.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  if (e.repeat) return;  // ignore OS auto-repeat
-  state.keys[k] = true;
-  if (k === ' ') { e.preventDefault(); doPing(); }
-  if (k === 'f') doFire();
-  if (k === 't') doDecoy();
-  if (k === '1') { state.player.tubes[0] = 'MK48'; toast('TUBE 1 LOADED', 'good', 1); }
-  if (k === '2') { state.player.tubes[1] = 'MK48'; toast('TUBE 2 LOADED', 'good', 1); }
-});
-window.addEventListener('keyup', e => {
-  state.keys[e.key.toLowerCase()] = false;
-});
+// ============================================================================
+// START
+// ============================================================================
+function startGame() {
+  state.mode = 'play';
+  state.time = 0;
+  state.wave = 1;
+  state.score = 0;
+  state.kills = 0;
+  state.enemies = [];
+  state.torpedoes = [];
+  state.particles = [];
+  state.bubbles = [];
+  state.decoys = [];
+  state.selectedTarget = null;
+  state.player = makePlayer();
+  generateTerrain();
+  startWave(1);
+  document.getElementById('endScreen').classList.remove('show');
+  document.getElementById('endScreen').classList.remove('lost');
+}
 
-const mapEl = document.getElementById('map');
-mapEl.addEventListener('mousemove', e => {
-  const rect = mapEl.getBoundingClientRect();
-  state.mouse.x = e.clientX - rect.left;
-  state.mouse.y = e.clientY - rect.top;
-  state.mouse.onMap = true;
-});
-mapEl.addEventListener('mouseleave', () => { state.mouse.onMap = false; });
-mapEl.addEventListener('mousedown', e => { state.mouse.leftDown = true; });
-mapEl.addEventListener('mouseup', e => { state.mouse.leftDown = false; });
-
-mapEl.addEventListener('touchstart', e => {
-  e.preventDefault();
-  const t = e.touches[0];
-  const rect = mapEl.getBoundingClientRect();
-  state.mouse.x = t.clientX - rect.left;
-  state.mouse.y = t.clientY - rect.top;
-  state.mouse.onMap = true;
-}, { passive: false });
-mapEl.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const t = e.touches[0];
-  const rect = mapEl.getBoundingClientRect();
-  state.mouse.x = t.clientX - rect.left;
-  state.mouse.y = t.clientY - rect.top;
-  state.mouse.onMap = true;
-}, { passive: false });
-mapEl.addEventListener('touchend', () => { state.mouse.onMap = false; });
-
-// control buttons
-document.querySelectorAll('button[data-act]').forEach(btn => {
-  const act = btn.dataset.act;
-  const handler = e => {
-    e.stopPropagation();
-    if (state.mode !== 'play') return;
-    if (act === 'ping') doPing();
-    if (act === 'fire') doFire();
-    if (act === 'decoy') doDecoy();
-    if (act === 'spd-up') { state.player.desiredSpeed = Math.min(15, state.player.desiredSpeed + 2); toast('SPEED UP', 'info', 0.8); }
-    if (act === 'spd-down') { state.player.desiredSpeed = Math.max(0, state.player.desiredSpeed - 2); toast('SLOW DOWN', 'info', 0.8); }
-    if (act === 'dep-up') { state.player.desiredDepth = Math.min(500, state.player.desiredDepth + 30); }
-    if (act === 'dep-down') { state.player.desiredDepth = Math.max(50, state.player.desiredDepth - 30); }
-    if (act === 't1') { state.player.tubes[0] = 'MK48'; toast('TUBE 1 LOADED', 'good', 1); }
-    if (act === 't2') { state.player.tubes[1] = 'MK48'; toast('TUBE 2 LOADED', 'good', 1); }
-  };
-  btn.addEventListener('click', handler);
-  btn.addEventListener('touchstart', handler, { passive: true });
-});
-
-// dpad
-document.querySelectorAll('.dpad-btn').forEach(btn => {
-  const k = btn.dataset.key;
-  const press = e => { e.preventDefault(); e.stopPropagation(); state.keys[k] = true; };
-  const release = e => { e.preventDefault(); e.stopPropagation(); state.keys[k] = false; };
-  btn.addEventListener('touchstart', press, { passive: false });
-  btn.addEventListener('touchend', release, { passive: false });
-  btn.addEventListener('touchcancel', release);
-  btn.addEventListener('mousedown', press);
-  btn.addEventListener('mouseup', release);
-  btn.addEventListener('mouseleave', release);
-});
-
-// start button
-$('start-btn').addEventListener('click', () => {
+document.getElementById('startBtn').addEventListener('click', () => {
   Audio.init();
-  $('overlay').classList.add('hidden');
+  document.getElementById('startScreen').classList.add('hidden');
   startGame();
 });
-
-function startGame() {
-  state.player.x = 0; state.player.y = 0;
-  state.player.heading = 0; state.player.depth = 200;
-  state.player.speed = 5; state.player.desiredSpeed = 5;
-  state.player.hull = 100; state.player.sonar = 100;
-  state.player.tubes = ['MK48', 'MK48'];
-  state.player.decoys = 4;
-  state.player.targetId = null;
-  state.torpedoes = [];
-  state.wakeTrails = [];
-  state.bubbles = [];
-  state.particles = [];
-  state.contacts = [];
-  state.nextId = 1;
-  state.time = 0;
-  state.missionTime = 0;
-  state.score = 0;
-  generateTerrain();
-  spawnEnemies(state.mission);
-  state.mode = 'play';
-  toast(`MISSION: ${state.missionName}`, 'info', 2.5);
-  Audio.setAmbientVolume(0.3);
-}
+document.getElementById('restartBtn').addEventListener('click', () => {
+  document.getElementById('endScreen').classList.remove('show');
+  startGame();
+});
 
 resize();
 requestAnimationFrame(loop);
